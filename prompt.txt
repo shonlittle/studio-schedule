@@ -1,0 +1,20 @@
+Build a Python program that generates an optimal class schedule for a dance studio. The data comes from an Excel file with three sheets:
+1. classes: contains class_name, style, level, age_start, age_end, duration (in hours), preferred_days, preferred_time_ranges, preferred_rooms, preferred_teachers
+2. teachers: contains teacher_name, availability
+3. rooms: contains room_name, availability, and group (to define rooms with accordion walls that cannot be used simultaneously)
+
+The program should:
+1. Load the data from the Excel file
+2. Break the day into 15-minute time slots (e.g., 15:15 to 21:00)
+3. Assign each class a teacher, room, day, and start time, respecting:
+- Class duration and time preference windows
+- Room and teacher availability
+- Room group exclusivity (e.g., if Room 1+2 is used, Room 1 and 2 cannot be used at the same time)
+- Only assign classes to one of their preferred rooms and teachers
+- Output the final schedule to an Excel or CSV file
+
+Use the Google OR-Tools CP-SAT solver to enforce constraints and find a feasible schedule. Organize the code into clear functions or modules for:
+- Data loading
+- Constraint modeling
+- Solving
+- Output formatting
