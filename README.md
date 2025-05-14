@@ -97,6 +97,22 @@ A pre-formatted Excel file is available at `./data/schedule-template.xlsx` to he
 
 ## Installation
 
+### Optional: Install VS Code
+
+We recommend using [Visual Studio Code](https://code.visualstudio.com/) as your editor for this project.
+
+1. Download and install VS Code: https://code.visualstudio.com/
+2. Open the project folder (`studio-schedule/`) in VS Code
+3. If prompted, install the recommended extensions (such as Python support)
+4. Open a terminal in VS Code (`View` > `Terminal`) and run the setup commands:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+pip install -r requirements.txt
+```
+
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
