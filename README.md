@@ -69,11 +69,37 @@ studio-schedule/
 └── README.md              # Documentation
 ```
 
+
+## Using the Schedule Template
+
+A pre-formatted Excel file is available at `./data/schedule-template.xlsx` to help you get started.
+
+### Instructions
+
+1. Open `schedule-template.xlsx` in Excel or Google Sheets.
+2. Fill out each sheet:
+   - **classes**: Add your studio’s classes, styles, age ranges, durations, and preferences.
+   - **teachers**: List each teacher and their availability by day and time range.
+   - **rooms**: Enter your studio rooms, their availability, and group identifiers (used for combined spaces like Room 1+2).
+3. Sample rows are included in each sheet for reference. **Please delete these before running the program**, but **do not change the column headers or sheet names**.
+4. Save the file (keeping the same structure and sheet names).
+5. Place the file in the `./data/` folder before running the program.
+
+### Formatting Rules
+
+- **Days and time values** should be entered in the format:
+  - `Monday:15:15-18:00,Tuesday:16:00-20:00`
+- Use **commas with no spaces** between entries.
+- Ensure all time values use **24-hour format** (`HH:MM`).
+
+**Important:** Do not rename the sheets or change the column names — the program relies on exact matches.
+
+
 ## Installation
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # or venv\Scripts\activate on Windows
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
 ```
 
@@ -83,7 +109,7 @@ pip install -r requirements.txt
 python src/main.py
 ```
 
-Make sure your `schedule-data.xlsx` file is in the `data/` directory.
+Make sure your `schedule-data.xlsx` file is in the `./data/` directory.
 
 ## Requirements
 
