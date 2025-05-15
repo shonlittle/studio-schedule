@@ -691,4 +691,54 @@ def add_preference_constraints(
                             ).OnlyEnforceIf(variables["class_scheduled"][i])
 
         # Preferred rooms
-        if class_data["preferred_rooms
+        if class_data["preferred_rooms"]:
+            # Create a list of allowed room indices
+            allowed_rooms = []
+            for room_name in class_data["preferred_rooms"]:
+                for r, room in enumerate(rooms):
+                    if room["room_name"] == room_name:
+                        allowed_rooms.append(r)
+                        break
+
+            # Class must be scheduled in one of the preferred rooms
+            if not relax_constraints and allowed_rooms:
+                for r in range(len(rooms)):
+                    if r not in allowed_rooms:
+                        # If room is not in allowed rooms, class cannot be scheduled in this room
+                        not_allowed_room = model.NewBoolVar(f"not_allowed_room_{i}_{r}")
+                        model.Add(variables["class_room"][i] == r).OnlyEnforceIf(
+                            not_allowed_room
+                        )
+                        model.AddBoolAnd(
+                            [not_allowed_room, variables["class_scheduled"][i].Not()]
+                        )
+
+        # Preferred teachers
+        if class_data["preferred_teachers"]:
+            # Create a list of allowed teacher indices
+            allowed_teachers = []
+            for teacher_name in class_data["preferred_teachers"]:
+                for t, teacher in enumerate(teachers):
+                    if teacher["teacher_name"] == teacher_name:
+                        allowed_teachers.append(t)
+                        break
+
+            # Class must be scheduled with one of the preferred teachers
+            if not relax_constraints and allowed_teachers:
+                for t in range(len(teachers)):
+                    if t not in allowed_teachers:
+                        # If teacher is not in allowed teachers, class cannot be scheduled with this teacher
+                        not_allowed_teacher = model.NewBoolVar(
+                            f"not_allowed_teacher_{i}_{t}"
+                        )
+                        model.Add(variables["class_teacher"][i] == t).OnlyEnforceIf(
+                            not_allowed_teacher
+                        )
+                        model.AddBoolAnd(
+                            [not_allowed_teacher, variables["class_scheduled"][i].Not()]
+                        )
+
+        # Add objective to maximize the number of scheduled classes
+        objective = model.NewIntVar(0, len(classes), "objective")
+        model.Add(objective == sum(variables["class_scheduled"].values()))
+        model.Maximize(objective)
