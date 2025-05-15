@@ -184,14 +184,49 @@ def add_room_constraints(model, variables, classes, rooms, relax_constraints=Tru
         classes (list): List of class data dictionaries.
         rooms (list): List of room data dictionaries.
     """
-    # Create a mapping of room groups
+    # Create a mapping of room groups and room names
     room_groups = {}
+    room_names = {}
+    room_indices = {}
+
     for i, room in enumerate(rooms):
+        room_name = room.get("room_name")
+        room_names[i] = room_name
+        room_indices[room_name] = i
+
         group = room.get("group")
         if group:
             if group not in room_groups:
                 room_groups[group] = []
             room_groups[group].append(i)
+
+    # Create a mapping of conflicting rooms
+    # If two rooms share any part (e.g., Room 1 and Room 1+2), they conflict
+    conflicting_rooms = {}
+    for i, room_i in enumerate(rooms):
+        conflicting_rooms[i] = set()
+        room_i_name = room_names[i]
+
+        # Check if this room is a combined room (contains a '+')
+        if "+" in room_i_name:
+            # This is a combined room, add all component rooms as conflicts
+            components = room_i_name.split("+")
+            for component in components:
+                component_name = component.strip()
+                if component_name in room_indices:
+                    conflicting_rooms[i].add(room_indices[component_name])
+
+        # Check if this room is a component of any combined room
+        for j, room_j in enumerate(rooms):
+            if i != j:
+                room_j_name = room_names[j]
+                if "+" in room_j_name:
+                    components = room_j_name.split("+")
+                    for component in components:
+                        component_name = component.strip()
+                        if component_name == room_i_name:
+                            conflicting_rooms[i].add(j)
+                            conflicting_rooms[i].add(j)
 
     # For each class
     for i, class_i in enumerate(classes):
@@ -359,6 +394,106 @@ def add_room_constraints(model, variables, classes, rooms, relax_constraints=Tru
 
                                 # If both are scheduled, they cannot have a group conflict
                                 model.AddBoolAnd([both_scheduled, group_conflict.Not()])
+
+    # Add constraints for conflicting rooms (e.g., Room 1 and Room 1+2)
+    for i, class_i in enumerate(classes):
+        for j, class_j in enumerate(classes):
+            if i < j:  # Only check each pair once
+                # For each room
+                for r1, conflicts in conflicting_rooms.items():
+                    for r2 in conflicts:
+                        # If class i is in room r1 and class j is in room r2 (or vice versa),
+                        # they cannot overlap in time on the same day
+
+                        # Same day
+                        same_day = model.NewBoolVar(
+                            f"conflict_same_day_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.Add(
+                            variables["class_day"][i] == variables["class_day"][j]
+                        ).OnlyEnforceIf(same_day)
+                        model.Add(
+                            variables["class_day"][i] != variables["class_day"][j]
+                        ).OnlyEnforceIf(same_day.Not())
+
+                        # Class i in room r1
+                        i_in_r1 = model.NewBoolVar(f"i_in_r1_{i}_{r1}")
+                        model.Add(variables["class_room"][i] == r1).OnlyEnforceIf(
+                            i_in_r1
+                        )
+                        model.Add(variables["class_room"][i] != r1).OnlyEnforceIf(
+                            i_in_r1.Not()
+                        )
+
+                        # Class j in room r2
+                        j_in_r2 = model.NewBoolVar(f"j_in_r2_{j}_{r2}")
+                        model.Add(variables["class_room"][j] == r2).OnlyEnforceIf(
+                            j_in_r2
+                        )
+                        model.Add(variables["class_room"][j] != r2).OnlyEnforceIf(
+                            j_in_r2.Not()
+                        )
+
+                        # Time overlap check
+                        # Class i starts before class j ends
+                        i_before_j_ends = model.NewBoolVar(
+                            f"conflict_i_before_j_ends_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.Add(
+                            variables["class_start"][i]
+                            < variables["class_start"][j] + class_j["duration_slots"]
+                        ).OnlyEnforceIf(i_before_j_ends)
+                        model.Add(
+                            variables["class_start"][i]
+                            >= variables["class_start"][j] + class_j["duration_slots"]
+                        ).OnlyEnforceIf(i_before_j_ends.Not())
+
+                        # Class j starts before class i ends
+                        j_before_i_ends = model.NewBoolVar(
+                            f"conflict_j_before_i_ends_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.Add(
+                            variables["class_start"][j]
+                            < variables["class_start"][i] + class_i["duration_slots"]
+                        ).OnlyEnforceIf(j_before_i_ends)
+                        model.Add(
+                            variables["class_start"][j]
+                            >= variables["class_start"][i] + class_i["duration_slots"]
+                        ).OnlyEnforceIf(j_before_i_ends.Not())
+
+                        # Time overlap occurs
+                        time_overlap = model.NewBoolVar(
+                            f"conflict_time_overlap_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.AddBoolAnd(
+                            [i_before_j_ends, j_before_i_ends]
+                        ).OnlyEnforceIf(time_overlap)
+
+                        # Room conflict occurs if:
+                        # 1. Same day
+                        # 2. Class i in room r1
+                        # 3. Class j in room r2
+                        # 4. Time overlap
+                        room_conflict = model.NewBoolVar(
+                            f"room_conflict_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.AddBoolAnd(
+                            [same_day, i_in_r1, j_in_r2, time_overlap]
+                        ).OnlyEnforceIf(room_conflict)
+
+                        # Both classes must be scheduled for conflict to matter
+                        both_scheduled = model.NewBoolVar(
+                            f"conflict_both_scheduled_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.AddBoolAnd(
+                            [
+                                variables["class_scheduled"][i],
+                                variables["class_scheduled"][j],
+                            ]
+                        ).OnlyEnforceIf(both_scheduled)
+
+                        # If both are scheduled, they cannot have a room conflict
+                        model.AddBoolAnd([both_scheduled, room_conflict.Not()])
 
 
 def add_teacher_constraints(
