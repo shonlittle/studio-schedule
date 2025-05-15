@@ -10,7 +10,9 @@ from ortools.sat.python import cp_model
 from src.data_loader import day_to_index, index_to_day
 
 
-def create_model(classes, teachers, rooms, max_days=7, max_slots=24):
+def create_model(
+    classes, teachers, rooms, max_days=7, max_slots=24, relax_constraints=True
+):
     """
     Create CP-SAT model with variables and constraints.
 
@@ -65,9 +67,11 @@ def create_model(classes, teachers, rooms, max_days=7, max_slots=24):
 
     # Add constraints
     add_time_constraints(model, variables, classes, max_slots)
-    add_room_constraints(model, variables, classes, rooms)
-    add_teacher_constraints(model, variables, classes, teachers)
-    add_preference_constraints(model, variables, classes, rooms, teachers)
+    add_room_constraints(model, variables, classes, rooms, relax_constraints)
+    add_teacher_constraints(model, variables, classes, teachers, relax_constraints)
+    add_preference_constraints(
+        model, variables, classes, rooms, teachers, relax_constraints
+    )
 
     return model, variables
 
@@ -170,7 +174,7 @@ def add_time_constraints(model, variables, classes, max_slots):
                 model.AddBoolAnd([both_scheduled, overlap.Not()])
 
 
-def add_room_constraints(model, variables, classes, rooms):
+def add_room_constraints(model, variables, classes, rooms, relax_constraints=True):
     """
     Add constraints related to rooms and room groups.
 
@@ -199,19 +203,20 @@ def add_room_constraints(model, variables, classes, rooms):
 
                 # If room is not available on this day
                 if day_name not in room["availability"]:
-                    # Class cannot be scheduled in this room on this day
-                    room_day_conflict = model.NewBoolVar(
-                        f"room_day_conflict_{i}_{r}_{day_idx}"
-                    )
-                    model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(
-                        room_day_conflict
-                    )
-                    model.Add(variables["class_room"][i] == r).OnlyEnforceIf(
-                        room_day_conflict
-                    )
-                    model.AddBoolAnd(
-                        [room_day_conflict, variables["class_scheduled"][i].Not()]
-                    )
+                    if not relax_constraints:
+                        # Class cannot be scheduled in this room on this day
+                        room_day_conflict = model.NewBoolVar(
+                            f"room_day_conflict_{i}_{r}_{day_idx}"
+                        )
+                        model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(
+                            room_day_conflict
+                        )
+                        model.Add(variables["class_room"][i] == r).OnlyEnforceIf(
+                            room_day_conflict
+                        )
+                        model.AddBoolAnd(
+                            [room_day_conflict, variables["class_scheduled"][i].Not()]
+                        )
 
                 # If room is available on this day, check time slots
                 else:
@@ -356,7 +361,9 @@ def add_room_constraints(model, variables, classes, rooms):
                                 model.AddBoolAnd([both_scheduled, group_conflict.Not()])
 
 
-def add_teacher_constraints(model, variables, classes, teachers):
+def add_teacher_constraints(
+    model, variables, classes, teachers, relax_constraints=True
+):
     """
     Add constraints related to teachers.
 
@@ -376,19 +383,23 @@ def add_teacher_constraints(model, variables, classes, teachers):
 
                 # If teacher is not available on this day
                 if day_name not in teacher["availability"]:
-                    # Class cannot be scheduled with this teacher on this day
-                    teacher_day_conflict = model.NewBoolVar(
-                        f"teacher_day_conflict_{i}_{t}_{day_idx}"
-                    )
-                    model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(
-                        teacher_day_conflict
-                    )
-                    model.Add(variables["class_teacher"][i] == t).OnlyEnforceIf(
-                        teacher_day_conflict
-                    )
-                    model.AddBoolAnd(
-                        [teacher_day_conflict, variables["class_scheduled"][i].Not()]
-                    )
+                    if not relax_constraints:
+                        # Class cannot be scheduled with this teacher on this day
+                        teacher_day_conflict = model.NewBoolVar(
+                            f"teacher_day_conflict_{i}_{t}_{day_idx}"
+                        )
+                        model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(
+                            teacher_day_conflict
+                        )
+                        model.Add(variables["class_teacher"][i] == t).OnlyEnforceIf(
+                            teacher_day_conflict
+                        )
+                        model.AddBoolAnd(
+                            [
+                                teacher_day_conflict,
+                                variables["class_scheduled"][i].Not(),
+                            ]
+                        )
 
                 # If teacher is available on this day, check time slots
                 else:
@@ -403,7 +414,7 @@ def add_teacher_constraints(model, variables, classes, teachers):
                                 fits = False
                                 break
 
-                        if not fits:
+                        if not fits and not relax_constraints:
                             # Class cannot start at this time with this teacher on this day
                             conflict = model.NewBoolVar(
                                 f"teacher_conflict_{i}_{t}_{day_idx}_{start_slot}"
@@ -490,8 +501,93 @@ def add_teacher_constraints(model, variables, classes, teachers):
                 # If both are scheduled, they cannot have a teacher conflict
                 model.AddBoolAnd([both_scheduled, teacher_conflict.Not()])
 
+    # Add constraints to balance teacher workload
+    if not relax_constraints:
+        # Create variables to track if a class is assigned to a teacher
+        teacher_class_vars = {}
+        for t in range(len(teachers)):
+            teacher_class_vars[t] = {}
+            for i in range(len(classes)):
+                # Create a boolean variable that is true if class i is assigned to teacher t
+                teacher_class_vars[t][i] = model.NewBoolVar(f"teacher_{t}_class_{i}")
 
-def add_preference_constraints(model, variables, classes, rooms, teachers):
+                # This variable is true if class i is scheduled and assigned to teacher t
+                class_assigned_to_teacher = model.NewBoolVar(
+                    f"class_{i}_assigned_to_{t}"
+                )
+                model.AddBoolAnd(
+                    [
+                        variables["class_scheduled"][i],
+                        model.NewBoolVar(f"class_{i}_teacher_{t}"),
+                    ]
+                ).OnlyEnforceIf(class_assigned_to_teacher)
+                model.Add(variables["class_teacher"][i] == t).OnlyEnforceIf(
+                    model.NewBoolVar(f"class_{i}_teacher_{t}")
+                )
+
+                # Link the variables
+                model.AddImplication(
+                    class_assigned_to_teacher, teacher_class_vars[t][i]
+                )
+                model.AddImplication(
+                    teacher_class_vars[t][i].Not(), class_assigned_to_teacher.Not()
+                )
+
+            # Count classes per teacher
+            teacher_class_count = model.NewIntVar(
+                0, len(classes), f"teacher_{t}_classes"
+            )
+            model.Add(teacher_class_count == sum(teacher_class_vars[t].values()))
+
+            # Limit classes per teacher (adjust max_classes_per_teacher as needed)
+            max_classes_per_teacher = 20  # Adjust this value based on your requirements
+            model.Add(teacher_class_count <= max_classes_per_teacher)
+
+            # Ensure each teacher has at least some classes (if there are enough classes)
+            min_classes_per_teacher = 1  # Adjust this value based on your requirements
+            if len(classes) >= len(teachers) * min_classes_per_teacher:
+                model.Add(teacher_class_count >= min_classes_per_teacher)
+
+        # Add constraints to distribute classes across days
+        for day_idx in range(7):
+            # Create variables to track if a class is scheduled on this day
+            day_class_vars = []
+            for i in range(len(classes)):
+                # Create a boolean variable that is true if class i is scheduled on day_idx
+                day_class_var = model.NewBoolVar(f"day_{day_idx}_class_{i}")
+
+                # This variable is true if class i is scheduled and assigned to day_idx
+                class_assigned_to_day = model.NewBoolVar(
+                    f"class_{i}_assigned_to_day_{day_idx}"
+                )
+                model.AddBoolAnd(
+                    [
+                        variables["class_scheduled"][i],
+                        model.NewBoolVar(f"class_{i}_day_{day_idx}"),
+                    ]
+                ).OnlyEnforceIf(class_assigned_to_day)
+                model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(
+                    model.NewBoolVar(f"class_{i}_day_{day_idx}")
+                )
+
+                # Link the variables
+                model.AddImplication(class_assigned_to_day, day_class_var)
+                model.AddImplication(day_class_var.Not(), class_assigned_to_day.Not())
+
+                day_class_vars.append(day_class_var)
+
+            # Count classes per day
+            day_class_count = model.NewIntVar(0, len(classes), f"day_{day_idx}_classes")
+            model.Add(day_class_count == sum(day_class_vars))
+
+            # Limit classes per day (adjust max_classes_per_day as needed)
+            max_classes_per_day = 30  # Adjust this value based on your requirements
+            model.Add(day_class_count <= max_classes_per_day)
+
+
+def add_preference_constraints(
+    model, variables, classes, rooms, teachers, relax_constraints=True
+):
     """
     Add constraints related to preferences.
 
@@ -510,9 +606,19 @@ def add_preference_constraints(model, variables, classes, rooms, teachers):
             allowed_days = [day_to_index(day) for day in class_data["preferred_days"]]
 
             # Class must be scheduled on one of the preferred days
-            model.AddAllowedValues(
-                variables["class_day"][i], allowed_days
-            ).OnlyEnforceIf(variables["class_scheduled"][i])
+            if not relax_constraints:
+                for day_idx in range(7):
+                    if day_idx not in allowed_days:
+                        # If day is not in allowed days, class cannot be scheduled on this day
+                        not_allowed_day = model.NewBoolVar(
+                            f"not_allowed_day_{i}_{day_idx}"
+                        )
+                        model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(
+                            not_allowed_day
+                        )
+                        model.AddBoolAnd(
+                            [not_allowed_day, variables["class_scheduled"][i].Not()]
+                        )
 
         # Preferred time ranges
         if class_data["preferred_time_ranges"]:
@@ -549,14 +655,30 @@ def add_preference_constraints(model, variables, classes, rooms, teachers):
                         time_constraint = model.NewBoolVar(
                             f"time_constraint_{i}_{day_idx}"
                         )
-                        model.AddAllowedValues(
-                            variables["class_start"][i], allowed_starts
-                        ).OnlyEnforceIf(time_constraint)
+                        # For each possible start time
+                        for start_slot in range(24):  # Assuming max 24 slots
+                            if start_slot not in allowed_starts:
+                                # If start time is not allowed, class cannot start at this time
+                                not_allowed_start = model.NewBoolVar(
+                                    f"not_allowed_start_{i}_{day_idx}_{start_slot}"
+                                )
+                                model.Add(
+                                    variables["class_start"][i] == start_slot
+                                ).OnlyEnforceIf(not_allowed_start)
+                                model.AddBoolAnd(
+                                    [not_allowed_start, time_constraint.Not()]
+                                )
 
-                        # If class is scheduled on this day, time constraint must be satisfied
-                        model.AddBoolAnd([day_match, time_constraint]).OnlyEnforceIf(
-                            variables["class_scheduled"][i]
-                        )
+                        if relax_constraints:
+                            # If relax_constraints is True, time preferences are optional
+                            # We'll add a soft constraint by not enforcing it
+                            pass
+                        else:
+                            # If relax_constraints is False, time preferences are required
+                            # If class is scheduled on this day, time constraint must be satisfied
+                            model.AddBoolAnd(
+                                [day_match, time_constraint]
+                            ).OnlyEnforceIf(variables["class_scheduled"][i])
 
         # Preferred rooms
         if class_data["preferred_rooms"]:
@@ -569,10 +691,20 @@ def add_preference_constraints(model, variables, classes, rooms, teachers):
                         break
 
             # Class must be assigned to one of the preferred rooms
-            if allowed_rooms:
-                model.AddAllowedValues(
-                    variables["class_room"][i], allowed_rooms
-                ).OnlyEnforceIf(variables["class_scheduled"][i])
+            if allowed_rooms and not relax_constraints:
+                # For each possible room
+                for room_idx in range(len(rooms)):
+                    if room_idx not in allowed_rooms:
+                        # If room is not allowed, class cannot be assigned to this room
+                        not_allowed_room = model.NewBoolVar(
+                            f"not_allowed_room_{i}_{room_idx}"
+                        )
+                        model.Add(variables["class_room"][i] == room_idx).OnlyEnforceIf(
+                            not_allowed_room
+                        )
+                        model.AddBoolAnd(
+                            [not_allowed_room, variables["class_scheduled"][i].Not()]
+                        )
 
         # Preferred teachers
         if class_data["preferred_teachers"]:
@@ -585,7 +717,17 @@ def add_preference_constraints(model, variables, classes, rooms, teachers):
                         break
 
             # Class must be assigned to one of the preferred teachers
-            if allowed_teachers:
-                model.AddAllowedValues(
-                    variables["class_teacher"][i], allowed_teachers
-                ).OnlyEnforceIf(variables["class_scheduled"][i])
+            if allowed_teachers and not relax_constraints:
+                # For each possible teacher
+                for teacher_idx in range(len(teachers)):
+                    if teacher_idx not in allowed_teachers:
+                        # If teacher is not allowed, class cannot be assigned to this teacher
+                        not_allowed_teacher = model.NewBoolVar(
+                            f"not_allowed_teacher_{i}_{teacher_idx}"
+                        )
+                        model.Add(
+                            variables["class_teacher"][i] == teacher_idx
+                        ).OnlyEnforceIf(not_allowed_teacher)
+                        model.AddBoolAnd(
+                            [not_allowed_teacher, variables["class_scheduled"][i].Not()]
+                        )
