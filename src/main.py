@@ -28,7 +28,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default=".",
+        default="../output",
         help="Directory to save the output file",
     )
     parser.add_argument(
