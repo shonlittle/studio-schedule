@@ -64,7 +64,7 @@ def main():
     # Create model
     print("Creating constraint model...")
     start_time = time.time()
-    model, variables = create_model(classes, teachers, rooms, relax_constraints=True)
+    model, variables = create_model(classes, teachers, rooms, relax_constraints=False)
     model_time = time.time() - start_time
     print(f"Model created in {model_time:.2f} seconds.")
 
