@@ -1,4 +1,3 @@
-
 # Studio Schedule
 
 An intelligent class scheduling system for dance studios, built in Python using Google OR-Tools.
@@ -17,6 +16,7 @@ An intelligent class scheduling system for dance studios, built in Python using 
 ## Excel Input Format
 
 ### classes (sheet)
+
 - class_name
 - style
 - level
@@ -29,10 +29,12 @@ An intelligent class scheduling system for dance studios, built in Python using 
 - preferred_teachers (comma-separated)
 
 ### teachers (sheet)
+
 - teacher_name
 - availability (e.g. Monday: 15:00-20:00; Tuesday: 15:00-20:00)
 
 ### rooms (sheet)
+
 - room_name
 - availability (same format as teachers)
 - group (e.g. group 1 for Room 1, Room 2, and Room 1+2)
@@ -69,7 +71,6 @@ studio-schedule/
 └── README.md              # Documentation
 ```
 
-
 ## Using the Schedule Template
 
 A pre-formatted Excel file is available at `./data/schedule-template.xlsx` to help you get started.
@@ -94,7 +95,6 @@ A pre-formatted Excel file is available at `./data/schedule-template.xlsx` to he
 
 **Important:** Do not rename the sheets or change the column names — the program relies on exact matches.
 
-
 ## Installation
 
 ### Optional: Install VS Code
@@ -105,13 +105,6 @@ We recommend using [Visual Studio Code](https://code.visualstudio.com/) as your 
 2. Open the project folder (`studio-schedule/`) in VS Code
 3. If prompted, install the recommended extensions (such as Python support)
 4. Open a terminal in VS Code (`View` > `Terminal`) and run the setup commands:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt
-```
-
 
 ```bash
 python -m venv .venv
