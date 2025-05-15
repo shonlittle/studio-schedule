@@ -178,3 +178,4 @@ cython_debug/
 
 # Output files
 output/
+output.csv
