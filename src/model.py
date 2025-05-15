@@ -502,87 +502,97 @@ def add_teacher_constraints(
                 model.AddBoolAnd([both_scheduled, teacher_conflict.Not()])
 
     # Add constraints to balance teacher workload
-    if not relax_constraints:
-        # Create variables to track if a class is assigned to a teacher
-        teacher_class_vars = {}
-        for t in range(len(teachers)):
-            teacher_class_vars[t] = {}
-            for i in range(len(classes)):
-                # Create a boolean variable that is true if class i is assigned to teacher t
-                teacher_class_vars[t][i] = model.NewBoolVar(f"teacher_{t}_class_{i}")
+    # Apply these constraints regardless of relax_constraints setting
+    # Create variables to track if a class is assigned to a teacher
+    teacher_class_vars = {}
+    for t in range(len(teachers)):
+        teacher_class_vars[t] = {}
+        for i in range(len(classes)):
+            # Create a boolean variable that is true if class i is assigned to teacher t
+            class_has_teacher_t = model.NewBoolVar(f"class_{i}_has_teacher_{t}")
 
-                # This variable is true if class i is scheduled and assigned to teacher t
-                class_assigned_to_teacher = model.NewBoolVar(
-                    f"class_{i}_assigned_to_{t}"
-                )
-                model.AddBoolAnd(
-                    [
-                        variables["class_scheduled"][i],
-                        model.NewBoolVar(f"class_{i}_teacher_{t}"),
-                    ]
-                ).OnlyEnforceIf(class_assigned_to_teacher)
-                model.Add(variables["class_teacher"][i] == t).OnlyEnforceIf(
-                    model.NewBoolVar(f"class_{i}_teacher_{t}")
-                )
-
-                # Link the variables
-                model.AddImplication(
-                    class_assigned_to_teacher, teacher_class_vars[t][i]
-                )
-                model.AddImplication(
-                    teacher_class_vars[t][i].Not(), class_assigned_to_teacher.Not()
-                )
-
-            # Count classes per teacher
-            teacher_class_count = model.NewIntVar(
-                0, len(classes), f"teacher_{t}_classes"
+            # This variable is true if class i is scheduled with teacher t
+            model.Add(variables["class_teacher"][i] == t).OnlyEnforceIf(
+                class_has_teacher_t
             )
-            model.Add(teacher_class_count == sum(teacher_class_vars[t].values()))
+            model.Add(variables["class_teacher"][i] != t).OnlyEnforceIf(
+                class_has_teacher_t.Not()
+            )
 
-            # Limit classes per teacher (adjust max_classes_per_teacher as needed)
-            max_classes_per_teacher = 20  # Adjust this value based on your requirements
-            model.Add(teacher_class_count <= max_classes_per_teacher)
+            # This variable is true if class i is scheduled with teacher t
+            teacher_class_vars[t][i] = model.NewBoolVar(
+                f"teacher_{t}_class_{i}_scheduled"
+            )
 
-            # Ensure each teacher has at least some classes (if there are enough classes)
-            min_classes_per_teacher = 1  # Adjust this value based on your requirements
-            if len(classes) >= len(teachers) * min_classes_per_teacher:
-                model.Add(teacher_class_count >= min_classes_per_teacher)
+            # Link the variables: teacher_class_vars[t][i] is true if class i is scheduled AND has teacher t
+            model.AddBoolAnd(
+                [variables["class_scheduled"][i], class_has_teacher_t]
+            ).OnlyEnforceIf(teacher_class_vars[t][i])
 
-        # Add constraints to distribute classes across days
-        for day_idx in range(7):
-            # Create variables to track if a class is scheduled on this day
-            day_class_vars = []
-            for i in range(len(classes)):
-                # Create a boolean variable that is true if class i is scheduled on day_idx
-                day_class_var = model.NewBoolVar(f"day_{day_idx}_class_{i}")
+            # If either class is not scheduled or doesn't have teacher t, then teacher_class_vars[t][i] is false
+            not_scheduled_or_not_teacher_t = model.NewBoolVar(
+                f"not_scheduled_or_not_teacher_{t}_{i}"
+            )
+            model.AddBoolOr(
+                [variables["class_scheduled"][i].Not(), class_has_teacher_t.Not()]
+            ).OnlyEnforceIf(not_scheduled_or_not_teacher_t)
+            model.AddImplication(
+                not_scheduled_or_not_teacher_t, teacher_class_vars[t][i].Not()
+            )
 
-                # This variable is true if class i is scheduled and assigned to day_idx
-                class_assigned_to_day = model.NewBoolVar(
-                    f"class_{i}_assigned_to_day_{day_idx}"
-                )
-                model.AddBoolAnd(
-                    [
-                        variables["class_scheduled"][i],
-                        model.NewBoolVar(f"class_{i}_day_{day_idx}"),
-                    ]
-                ).OnlyEnforceIf(class_assigned_to_day)
-                model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(
-                    model.NewBoolVar(f"class_{i}_day_{day_idx}")
-                )
+        # Count classes per teacher
+        teacher_class_count = model.NewIntVar(0, len(classes), f"teacher_{t}_classes")
+        model.Add(teacher_class_count == sum(teacher_class_vars[t].values()))
 
-                # Link the variables
-                model.AddImplication(class_assigned_to_day, day_class_var)
-                model.AddImplication(day_class_var.Not(), class_assigned_to_day.Not())
+        # Limit classes per teacher (adjust max_classes_per_teacher as needed)
+        max_classes_per_teacher = 20  # Adjust this value based on your requirements
+        model.Add(teacher_class_count <= max_classes_per_teacher)
 
-                day_class_vars.append(day_class_var)
+        # Ensure each teacher has at least some classes (if there are enough classes)
+        min_classes_per_teacher = 1  # Adjust this value based on your requirements
+        if len(classes) >= len(teachers) * min_classes_per_teacher:
+            model.Add(teacher_class_count >= min_classes_per_teacher)
 
-            # Count classes per day
-            day_class_count = model.NewIntVar(0, len(classes), f"day_{day_idx}_classes")
-            model.Add(day_class_count == sum(day_class_vars))
+    # Add constraints to distribute classes across days
+    for day_idx in range(7):
+        # Create variables to track if a class is scheduled on this day
+        day_class_vars = []
+        for i in range(len(classes)):
+            # Create a boolean variable that is true if class i is scheduled on day_idx
+            day_class_var = model.NewBoolVar(f"day_{day_idx}_class_{i}")
 
-            # Limit classes per day (adjust max_classes_per_day as needed)
-            max_classes_per_day = 30  # Adjust this value based on your requirements
-            model.Add(day_class_count <= max_classes_per_day)
+            # Create a boolean variable that is true if class i is assigned to day_idx
+            class_has_day = model.NewBoolVar(f"class_{i}_has_day_{day_idx}")
+
+            # This variable is true if class i is scheduled on day_idx
+            model.Add(variables["class_day"][i] == day_idx).OnlyEnforceIf(class_has_day)
+            model.Add(variables["class_day"][i] != day_idx).OnlyEnforceIf(
+                class_has_day.Not()
+            )
+
+            # Link the variables: day_class_var is true if class i is scheduled AND has day_idx
+            model.AddBoolAnd(
+                [variables["class_scheduled"][i], class_has_day]
+            ).OnlyEnforceIf(day_class_var)
+
+            # If either class is not scheduled or doesn't have day_idx, then day_class_var is false
+            not_scheduled_or_not_day = model.NewBoolVar(
+                f"not_scheduled_or_not_day_{day_idx}_{i}"
+            )
+            model.AddBoolOr(
+                [variables["class_scheduled"][i].Not(), class_has_day.Not()]
+            ).OnlyEnforceIf(not_scheduled_or_not_day)
+            model.AddImplication(not_scheduled_or_not_day, day_class_var.Not())
+
+            day_class_vars.append(day_class_var)
+
+        # Count classes per day
+        day_class_count = model.NewIntVar(0, len(classes), f"day_{day_idx}_classes")
+        model.Add(day_class_count == sum(day_class_vars))
+
+        # Limit classes per day (adjust max_classes_per_day as needed)
+        max_classes_per_day = 30  # Adjust this value based on your requirements
+        model.Add(day_class_count <= max_classes_per_day)
 
 
 def add_preference_constraints(
@@ -681,53 +691,4 @@ def add_preference_constraints(
                             ).OnlyEnforceIf(variables["class_scheduled"][i])
 
         # Preferred rooms
-        if class_data["preferred_rooms"]:
-            # Create a list of allowed room indices
-            allowed_rooms = []
-            for room_name in class_data["preferred_rooms"]:
-                for r, room in enumerate(rooms):
-                    if room["room_name"] == room_name:
-                        allowed_rooms.append(r)
-                        break
-
-            # Class must be assigned to one of the preferred rooms
-            if allowed_rooms and not relax_constraints:
-                # For each possible room
-                for room_idx in range(len(rooms)):
-                    if room_idx not in allowed_rooms:
-                        # If room is not allowed, class cannot be assigned to this room
-                        not_allowed_room = model.NewBoolVar(
-                            f"not_allowed_room_{i}_{room_idx}"
-                        )
-                        model.Add(variables["class_room"][i] == room_idx).OnlyEnforceIf(
-                            not_allowed_room
-                        )
-                        model.AddBoolAnd(
-                            [not_allowed_room, variables["class_scheduled"][i].Not()]
-                        )
-
-        # Preferred teachers
-        if class_data["preferred_teachers"]:
-            # Create a list of allowed teacher indices
-            allowed_teachers = []
-            for teacher_name in class_data["preferred_teachers"]:
-                for t, teacher in enumerate(teachers):
-                    if teacher["teacher_name"] == teacher_name:
-                        allowed_teachers.append(t)
-                        break
-
-            # Class must be assigned to one of the preferred teachers
-            if allowed_teachers and not relax_constraints:
-                # For each possible teacher
-                for teacher_idx in range(len(teachers)):
-                    if teacher_idx not in allowed_teachers:
-                        # If teacher is not allowed, class cannot be assigned to this teacher
-                        not_allowed_teacher = model.NewBoolVar(
-                            f"not_allowed_teacher_{i}_{teacher_idx}"
-                        )
-                        model.Add(
-                            variables["class_teacher"][i] == teacher_idx
-                        ).OnlyEnforceIf(not_allowed_teacher)
-                        model.AddBoolAnd(
-                            [not_allowed_teacher, variables["class_scheduled"][i].Not()]
-                        )
+        if class_data["preferred_rooms
