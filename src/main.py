@@ -84,10 +84,16 @@ def main():
             f"({stats['scheduling_rate'] * 100:.1f}%)."
         )
 
-        # Create output file
-        print("Creating output file...")
+        # Create output files
+        print("Creating output files...")
         output_file = create_schedule_output(schedule, rooms, teachers, args.output_dir)
         print(f"Schedule saved to '{output_file}'.")
+
+        # Create CSV output in current directory
+        from output import create_csv_output
+
+        csv_output_file = create_csv_output(schedule, rooms, teachers, "output.csv")
+        print(f"CSV schedule saved to '{csv_output_file}'.")
 
         # Print room utilization
         print("\nRoom Utilization:")
