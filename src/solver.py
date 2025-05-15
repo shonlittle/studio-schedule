@@ -7,7 +7,7 @@ the solution.
 
 from ortools.sat.python import cp_model
 
-from src.data_loader import index_to_day, time_slot_to_time
+from data_loader import index_to_day, time_slot_to_time
 
 
 def solve_schedule(model, variables, classes, time_limit=60):

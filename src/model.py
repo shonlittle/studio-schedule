@@ -7,7 +7,7 @@ with variables and constraints.
 
 from ortools.sat.python import cp_model
 
-from src.data_loader import day_to_index, index_to_day
+from data_loader import day_to_index, index_to_day
 
 
 def create_model(
@@ -737,8 +737,3 @@ def add_preference_constraints(
                         model.AddBoolAnd(
                             [not_allowed_teacher, variables["class_scheduled"][i].Not()]
                         )
-
-        # Add objective to maximize the number of scheduled classes
-        objective = model.NewIntVar(0, len(classes), "objective")
-        model.Add(objective == sum(variables["class_scheduled"].values()))
-        model.Maximize(objective)

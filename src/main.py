@@ -9,10 +9,10 @@ import os
 import sys
 import time
 
-from src.data_loader import load_data
-from src.model import create_model
-from src.output import create_schedule_output
-from src.solver import get_solution_stats, solve_schedule
+from data_loader import load_data
+from model import create_model
+from output import create_schedule_output
+from solver import get_solution_stats, solve_schedule
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
     parser.add_argument(
         "--data",
         type=str,
-        default="data/schedule-data.xlsx",
+        default="../data/schedule-data.xlsx",
         help="Path to the Excel file containing schedule data",
     )
     parser.add_argument(
