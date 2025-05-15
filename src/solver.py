@@ -37,6 +37,9 @@ def solve_schedule(model, variables, classes, time_limit=60):
     )
     model.Maximize(objective)
 
+    # Set solver parameters for better debugging
+    solver.parameters.log_search_progress = True
+
     # Solve the model
     status = solver.Solve(model)
 
