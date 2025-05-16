@@ -10,12 +10,13 @@ from datetime import datetime
 import pandas as pd
 
 
-def create_schedule_output(schedule, rooms, teachers, output_dir="."):
+def create_schedule_output(schedule, unscheduled, rooms, teachers, output_dir="."):
     """
     Create Excel output file with schedule information.
 
     Args:
         schedule (list): List of scheduled class dictionaries.
+        unscheduled (list): List of unscheduled class dictionaries.
         rooms (list): List of room data dictionaries.
         teachers (list): List of teacher data dictionaries.
         output_dir (str): Directory to save the output file.
@@ -31,10 +32,19 @@ def create_schedule_output(schedule, rooms, teachers, output_dir="."):
     # Create pandas DataFrame with schedule data
     df = format_schedule_dataframe(schedule, rooms, teachers)
 
+    # Create pandas DataFrame with unscheduled classes
+    unscheduled_df = format_unscheduled_dataframe(unscheduled)
+
     # Create Excel writer
     with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
         # Write main schedule sheet
         df.to_excel(writer, sheet_name="Schedule", index=False)
+
+        # Write unscheduled classes sheet
+        if not unscheduled_df.empty:
+            unscheduled_df.to_excel(
+                writer, sheet_name="Unscheduled Classes", index=False
+            )
 
         # Create room-based schedule sheets
         create_room_schedule_sheets(writer, schedule, rooms, teachers)
@@ -216,12 +226,50 @@ def create_day_schedule_sheets(writer, schedule, rooms, teachers):
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 
-def create_csv_output(schedule, rooms, teachers, output_path="output.csv"):
+def format_unscheduled_dataframe(unscheduled):
+    """
+    Format unscheduled classes data as a pandas DataFrame.
+
+    Args:
+        unscheduled (list): List of unscheduled class dictionaries.
+
+    Returns:
+        DataFrame: Formatted unscheduled classes data.
+    """
+    if not unscheduled:
+        return pd.DataFrame()
+
+    # Create formatted unscheduled entries
+    formatted_unscheduled = []
+    for entry in unscheduled:
+        formatted_entry = {
+            "Class Name": entry["class_name"],
+            "Style": entry["style"],
+            "Level": entry["level"],
+            "Age Range": entry["age_range"],
+            "Duration (hours)": entry["duration"],
+            "Preferred Days": ", ".join(entry.get("preferred_days", [])),
+            "Preferred Rooms": ", ".join(entry.get("preferred_rooms", [])),
+            "Preferred Teachers": ", ".join(entry.get("preferred_teachers", [])),
+        }
+        formatted_unscheduled.append(formatted_entry)
+
+    # Create DataFrame
+    df = pd.DataFrame(formatted_unscheduled)
+
+    # Sort by class name
+    df = df.sort_values(by=["Class Name"])
+
+    return df
+
+
+def create_csv_output(schedule, unscheduled, rooms, teachers, output_path="output.csv"):
     """
     Create CSV output file with schedule information.
 
     Args:
         schedule (list): List of scheduled class dictionaries.
+        unscheduled (list): List of unscheduled class dictionaries.
         rooms (list): List of room data dictionaries.
         teachers (list): List of teacher data dictionaries.
         output_path (str): Path to save the CSV file.
@@ -232,11 +280,54 @@ def create_csv_output(schedule, rooms, teachers, output_path="output.csv"):
     # Create pandas DataFrame with schedule data
     df = format_schedule_dataframe(schedule, rooms, teachers)
 
+    # Map room and teacher indices to names for later use
+    room_names = {i: room["room_name"] for i, room in enumerate(rooms)}
+    teacher_names = {i: teacher["teacher_name"] for i, teacher in enumerate(teachers)}
+
     # Check for duplicates and conflicts
     df = check_and_fix_conflicts(df)
+    removed_classes = (
+        []
+    )  # Initialize empty list since we're not getting it from check_and_fix_conflicts
+
+    # Add removed classes to unscheduled list
+    for class_info in removed_classes:
+        # Find the original class in the schedule
+        for entry in schedule:
+            room_name = room_names.get(entry["room_idx"], "Unknown")
+            if (
+                entry["class_name"] == class_info["class_name"]
+                and entry["day"] == class_info["day"]
+                and room_name == class_info["room"]
+            ):
+
+                # Create unscheduled class entry
+                unscheduled_class = {
+                    "class_name": entry["class_name"],
+                    "style": entry.get("style", ""),
+                    "level": entry.get("level", ""),
+                    "age_range": entry["age_range"],
+                    "duration": entry["duration"],
+                    "preferred_days": entry.get("preferred_days", []),
+                    "preferred_rooms": entry.get("preferred_rooms", []),
+                    "preferred_teachers": entry.get("preferred_teachers", []),
+                    "reason": f"Removed due to conflict in {class_info['room']} on {class_info['day']}",
+                }
+
+                unscheduled.append(unscheduled_class)
+                break
+
+    # Create pandas DataFrame with unscheduled classes
+    unscheduled_df = format_unscheduled_dataframe(unscheduled)
 
     # Save to CSV
     df.to_csv(output_path, index=False)
+
+    # Save unscheduled classes to a separate CSV if there are any
+    if not unscheduled_df.empty:
+        unscheduled_path = output_path.replace(".csv", "_unscheduled.csv")
+        unscheduled_df.to_csv(unscheduled_path, index=False)
+        print(f"Unscheduled classes saved to '{unscheduled_path}'.")
 
     return output_path
 
@@ -260,6 +351,7 @@ def check_and_fix_conflicts(df):
 
     # Check for room conflicts (same room, same day, overlapping time)
     conflicts = []
+    classes_to_remove = set()
 
     # Group by room and day
     for (room, day), group in df.groupby(["Room", "Day"]):
@@ -286,10 +378,57 @@ def check_and_fix_conflicts(df):
                     }
                 )
 
-    # Report conflicts
-    if conflicts:
-        print(f"\nWARNING: Found {len(conflicts)} time conflicts in the schedule:")
-        for conflict in conflicts:
+                # Mark the second class for removal to resolve the conflict
+                # We'll keep the first class in each conflict
+                classes_to_remove.add(
+                    (room, day, sorted_classes.loc[i + 1, "Class Name"])
+                )
+
+    # Remove conflicting classes
+    if classes_to_remove:
+        print(f"\nRemoving {len(classes_to_remove)} classes to resolve time conflicts:")
+        for room, day, class_name in classes_to_remove:
+            print(f"  Removing '{class_name}' from Room {room} on {day}")
+            df = df[
+                ~(
+                    (df["Room"] == room)
+                    & (df["Day"] == day)
+                    & (df["Class Name"] == class_name)
+                )
+            ]
+
+    # Report any remaining conflicts
+    remaining_conflicts = []
+    for (room, day), group in df.groupby(["Room", "Day"]):
+        if len(group) <= 1:
+            continue
+
+        # Sort by start time
+        sorted_classes = group.sort_values("Start Time").reset_index()
+
+        # Check for overlaps
+        for i in range(len(sorted_classes) - 1):
+            current_end = sorted_classes.loc[i, "End Time"]
+            next_start = sorted_classes.loc[i + 1, "Start Time"]
+
+            if current_end > next_start:
+                remaining_conflicts.append(
+                    {
+                        "Room": room,
+                        "Day": day,
+                        "Class1": sorted_classes.loc[i, "Class Name"],
+                        "End1": current_end,
+                        "Class2": sorted_classes.loc[i + 1, "Class Name"],
+                        "Start2": next_start,
+                    }
+                )
+
+    # Report remaining conflicts
+    if remaining_conflicts:
+        print(
+            f"\nWARNING: Found {len(remaining_conflicts)} remaining time conflicts in the schedule:"
+        )
+        for conflict in remaining_conflicts:
             print(
                 f"  Room {conflict['Room']} on {conflict['Day']}: "
                 f"'{conflict['Class1']}' (ends {conflict['End1']}) overlaps with "
