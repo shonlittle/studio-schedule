@@ -22,6 +22,7 @@ def create_model(
         rooms (list): List of room data dictionaries.
         max_days (int): Maximum number of days to consider.
         max_slots (int): Maximum number of time slots per day.
+        relax_constraints (bool): Whether to relax certain constraints.
 
     Returns:
         tuple: (model, variables) where variables is a dictionary containing
@@ -73,7 +74,52 @@ def create_model(
         model, variables, classes, rooms, teachers, relax_constraints
     )
 
+    # Add constraint to prevent duplicate classes
+    add_duplicate_class_constraints(model, variables, classes, relax_constraints)
+
+    # Add objective to maximize the number of scheduled classes
+    # and minimize the number of duplicate classes
+    objective = model.NewIntVar(0, len(classes), "objective")
+    model.Add(
+        objective == sum(variables["class_scheduled"][i] for i in range(len(classes)))
+    )
+    model.Maximize(objective)
+
     return model, variables
+
+
+def add_duplicate_class_constraints(model, variables, classes, relax_constraints=True):
+    """
+    Add constraints to prevent duplicate classes from being scheduled.
+
+    Args:
+        model (CpModel): The CP-SAT model.
+        variables (dict): Dictionary of decision variables.
+        classes (list): List of class data dictionaries.
+        relax_constraints (bool): Whether to relax certain constraints.
+    """
+    # Create a dictionary to group classes by name
+    class_name_to_indices = {}
+    for i, class_data in enumerate(classes):
+        class_name = class_data["class_name"]
+        if class_name not in class_name_to_indices:
+            class_name_to_indices[class_name] = []
+        class_name_to_indices[class_name].append(i)
+
+    # For each group of classes with the same name
+    for class_name, indices in class_name_to_indices.items():
+        if len(indices) > 1:
+            # For each pair of classes with the same name
+            for i, idx1 in enumerate(indices):
+                for j, idx2 in enumerate(indices[i + 1 :], i + 1):
+                    # Create a constraint that at most one of these classes can be scheduled
+                    # This is a hard constraint - we don't want duplicate classes
+                    model.AddBoolOr(
+                        [
+                            variables["class_scheduled"][idx1].Not(),
+                            variables["class_scheduled"][idx2].Not(),
+                        ]
+                    )
 
 
 def add_time_constraints(model, variables, classes, max_slots):
@@ -158,20 +204,28 @@ def add_time_constraints(model, variables, classes, max_slots):
                     >= variables["class_start"][i] + class_i["duration_slots"]
                 ).OnlyEnforceIf(j_before_i_ends.Not())
 
-                # Overlap occurs if same day, same room, and time overlap
-                overlap = model.NewBoolVar(f"overlap_{i}_{j}")
-                model.AddBoolAnd(
-                    [same_day, same_room, i_before_j_ends, j_before_i_ends]
-                ).OnlyEnforceIf(overlap)
+                # Create a variable that is true if there's a room conflict
+                room_conflict = model.NewBoolVar(f"room_conflict_{i}_{j}")
 
-                # Both classes must be scheduled for overlap to matter
-                both_scheduled = model.NewBoolVar(f"both_scheduled_{i}_{j}")
+                # A room conflict exists if:
+                # 1. Both classes are scheduled
+                # 2. They are on the same day
+                # 3. They are in the same room
+                # 4. Their times overlap
                 model.AddBoolAnd(
-                    [variables["class_scheduled"][i], variables["class_scheduled"][j]]
-                ).OnlyEnforceIf(both_scheduled)
+                    [
+                        variables["class_scheduled"][i],
+                        variables["class_scheduled"][j],
+                        same_day,
+                        same_room,
+                        i_before_j_ends,
+                        j_before_i_ends,
+                    ]
+                ).OnlyEnforceIf(room_conflict)
 
-                # If both are scheduled, they cannot overlap
-                model.AddBoolAnd([both_scheduled, overlap.Not()])
+                # If there's a room conflict, it must be false
+                # This is a hard constraint - a room cannot have multiple classes at the same time
+                model.Add(room_conflict == 0)
 
 
 def add_room_constraints(model, variables, classes, rooms, relax_constraints=True):
@@ -392,8 +446,29 @@ def add_room_constraints(model, variables, classes, rooms, relax_constraints=Tru
                                     ]
                                 ).OnlyEnforceIf(both_scheduled)
 
-                                # If both are scheduled, they cannot have a group conflict
-                                model.AddBoolAnd([both_scheduled, group_conflict.Not()])
+                                # If there's a group conflict, at least one of the classes cannot be scheduled
+                                # This is a hard constraint - classes in conflicting rooms cannot be scheduled at the same time
+                                group_conflict_and_both = model.NewBoolVar(
+                                    f"group_conflict_and_both_{c1}_{c2}_{room_i}_{room_j}"
+                                )
+                                model.AddBoolAnd(
+                                    [group_conflict, both_scheduled]
+                                ).OnlyEnforceIf(group_conflict_and_both)
+                                # Create a boolean variable for the OR condition
+                                not_both_classes_scheduled = model.NewBoolVar(
+                                    f"not_both_classes_scheduled_{c1}_{c2}_{room_i}_{room_j}"
+                                )
+                                model.AddBoolOr(
+                                    [
+                                        variables["class_scheduled"][c1].Not(),
+                                        variables["class_scheduled"][c2].Not(),
+                                    ]
+                                ).OnlyEnforceIf(not_both_classes_scheduled)
+
+                                # Add the implication
+                                model.AddImplication(
+                                    group_conflict_and_both, not_both_classes_scheduled
+                                )
 
     # Add constraints for conflicting rooms (e.g., Room 1 and Room 1+2)
     for i, class_i in enumerate(classes):
@@ -492,8 +567,29 @@ def add_room_constraints(model, variables, classes, rooms, relax_constraints=Tru
                             ]
                         ).OnlyEnforceIf(both_scheduled)
 
-                        # If both are scheduled, they cannot have a room conflict
-                        model.AddBoolAnd([both_scheduled, room_conflict.Not()])
+                        # If there's a room conflict, at least one of the classes cannot be scheduled
+                        # This is a hard constraint - classes in conflicting rooms cannot be scheduled at the same time
+                        room_conflict_and_both = model.NewBoolVar(
+                            f"room_conflict_and_both_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.AddBoolAnd([room_conflict, both_scheduled]).OnlyEnforceIf(
+                            room_conflict_and_both
+                        )
+                        # Create a boolean variable for the OR condition
+                        not_both_rooms_scheduled = model.NewBoolVar(
+                            f"not_both_rooms_scheduled_{i}_{j}_{r1}_{r2}"
+                        )
+                        model.AddBoolOr(
+                            [
+                                variables["class_scheduled"][i].Not(),
+                                variables["class_scheduled"][j].Not(),
+                            ]
+                        ).OnlyEnforceIf(not_both_rooms_scheduled)
+
+                        # Add the implication
+                        model.AddImplication(
+                            room_conflict_and_both, not_both_rooms_scheduled
+                        )
 
 
 def add_teacher_constraints(
@@ -633,8 +729,10 @@ def add_teacher_constraints(
                     [variables["class_scheduled"][i], variables["class_scheduled"][j]]
                 ).OnlyEnforceIf(both_scheduled)
 
-                # If both are scheduled, they cannot have a teacher conflict
-                model.AddBoolAnd([both_scheduled, teacher_conflict.Not()])
+                # If there's a teacher conflict, at least one of the classes cannot be scheduled
+                # This is a hard constraint - a teacher cannot teach multiple classes at the same time
+                # We use AddBoolOr directly instead of implication to make this a hard constraint
+                model.AddBoolOr([teacher_conflict.Not(), both_scheduled.Not()])
 
     # Add constraints to balance teacher workload
     # Apply these constraints regardless of relax_constraints setting

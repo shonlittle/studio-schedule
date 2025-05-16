@@ -21,8 +21,9 @@ def solve_schedule(model, variables, classes, time_limit=60):
         time_limit (int): Time limit for solving in seconds.
 
     Returns:
-        tuple: (status, schedule) where status is a string indicating the
-               solution status and schedule is a list of scheduled classes.
+        tuple: (status, (schedule, unscheduled)) where status is a string indicating the
+               solution status, schedule is a list of scheduled classes, and unscheduled
+               is a list of classes that could not be scheduled.
     """
     # Create CP-SAT solver
     solver = cp_model.CpSolver()
@@ -31,11 +32,8 @@ def solve_schedule(model, variables, classes, time_limit=60):
     solver.parameters.max_time_in_seconds = time_limit
 
     # Objective: Maximize the number of scheduled classes
-    objective = model.NewIntVar(0, len(classes), "objective")
-    model.Add(
-        objective == sum(variables["class_scheduled"][i] for i in range(len(classes)))
-    )
-    model.Maximize(objective)
+    # This is already set as the primary objective in the model
+    # We don't need to add it again here
 
     # Set solver parameters for better debugging
     solver.parameters.log_search_progress = True
@@ -46,15 +44,15 @@ def solve_schedule(model, variables, classes, time_limit=60):
     # Check if solution is feasible
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         # Extract solution
-        schedule = extract_solution(solver, variables, classes)
+        schedule, unscheduled = extract_solution(solver, variables, classes)
 
         # Return status and schedule
         status_str = "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"
-        return status_str, schedule
+        return status_str, (schedule, unscheduled)
     else:
         # No feasible solution found
         status_str = "INFEASIBLE" if status == cp_model.INFEASIBLE else "UNKNOWN"
-        return status_str, []
+        return status_str, ([], [])
 
 
 def extract_solution(solver, variables, classes):
@@ -67,9 +65,10 @@ def extract_solution(solver, variables, classes):
         classes (list): List of class data dictionaries.
 
     Returns:
-        list: List of scheduled class dictionaries.
+        tuple: (scheduled_classes, unscheduled_classes) where each is a list of class dictionaries.
     """
     schedule = []
+    unscheduled = []
 
     # For each class
     for i, class_data in enumerate(classes):
@@ -101,6 +100,20 @@ def extract_solution(solver, variables, classes):
             }
 
             schedule.append(scheduled_class)
+        else:
+            # Create unscheduled class entry
+            unscheduled_class = {
+                "class_name": class_data["class_name"],
+                "style": class_data.get("style", ""),
+                "level": class_data.get("level", ""),
+                "age_range": f"{class_data.get('age_start', 0)}-{class_data.get('age_end', 99)}",
+                "duration": class_data["duration"],
+                "preferred_days": class_data.get("preferred_days", []),
+                "preferred_rooms": class_data.get("preferred_rooms", []),
+                "preferred_teachers": class_data.get("preferred_teachers", []),
+            }
+
+            unscheduled.append(unscheduled_class)
 
     # Sort schedule by day and start time
     day_order = {
@@ -115,7 +128,7 @@ def extract_solution(solver, variables, classes):
 
     schedule.sort(key=lambda x: (day_order.get(x["day"], 7), x["start_time"]))
 
-    return schedule
+    return schedule, unscheduled
 
 
 def get_solution_stats(schedule, classes, rooms, teachers):

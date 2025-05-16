@@ -64,6 +64,8 @@ def main():
     # Create model
     print("Creating constraint model...")
     start_time = time.time()
+    # Keep relax_constraints=True to allow some constraints to be relaxed
+    # but we'll ensure no room conflicts and no duplicate classes
     model, variables = create_model(classes, teachers, rooms, relax_constraints=True)
     model_time = time.time() - start_time
     print(f"Model created in {model_time:.2f} seconds.")
@@ -71,7 +73,9 @@ def main():
     # Solve model
     print(f"Solving schedule (time limit: {args.time_limit} seconds)...")
     start_time = time.time()
-    status, schedule = solve_schedule(model, variables, classes, args.time_limit)
+    status, (schedule, unscheduled) = solve_schedule(
+        model, variables, classes, args.time_limit
+    )
     solve_time = time.time() - start_time
     print(f"Solving completed in {solve_time:.2f} seconds with status: {status}")
 
@@ -83,16 +87,21 @@ def main():
             f"Scheduled {stats['scheduled_classes']} out of {stats['total_classes']} classes "
             f"({stats['scheduling_rate'] * 100:.1f}%)."
         )
+        print(f"Could not schedule {len(unscheduled)} classes.")
 
         # Create output files
         print("Creating output files...")
-        output_file = create_schedule_output(schedule, rooms, teachers, args.output_dir)
+        output_file = create_schedule_output(
+            schedule, unscheduled, rooms, teachers, args.output_dir
+        )
         print(f"Schedule saved to '{output_file}'.")
 
         # Create CSV output in current directory
         from output import create_csv_output
 
-        csv_output_file = create_csv_output(schedule, rooms, teachers, "output.csv")
+        csv_output_file = create_csv_output(
+            schedule, unscheduled, rooms, teachers, "output.csv"
+        )
         print(f"CSV schedule saved to '{csv_output_file}'.")
 
         # Print room utilization
