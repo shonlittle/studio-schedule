@@ -25,29 +25,65 @@ An intelligent class scheduling system for dance studios, built in Python.
 
 ## Excel Input Format
 
-### classes (sheet)
+### `classes` (sheet)
 
-- class_name
-- style
-- level
-- age_start
-- age_end
-- duration (in hours)
-- preferred_days (comma-separated)
-- preferred_time_ranges (e.g. 15:00-18:00, comma-separated)
-- preferred_rooms (comma-separated)
-- preferred_teachers (comma-separated)
+Contains core information about each individual class.
 
-### teachers (sheet)
+- `class_id` — Unique identifier for the class instance
+- `class_name` — Display name (not necessarily unique)
+- `style` — Dance style (e.g., Ballet, Jazz)
+- `level` — Class level (e.g., IA, IB)
+- `age_start` — Minimum student age
+- `age_end` — Maximum student age
+- `duration` — Class duration in **hours** (e.g., 0.75 for 45 minutes)
 
-- teacher_name
-- availability (e.g. Monday: 15:00-20:00; Tuesday: 15:00-20:00)
+### `teacher_availability` (sheet)
 
-### rooms (sheet)
+Indicates when teachers are available to teach.
 
-- room_name
-- availability (same format as teachers)
-- group (e.g. group 1 for Room 1, Room 2, and Room 1+2)
+- `teacher_id` — Unique ID for the teacher
+- `teacher_name`
+- `day`
+- `start_time`
+- `end_time`
+
+### `room_availability` (sheet)
+
+Defines room availability on a per-day basis.
+
+- `room_id` — Unique ID for the room
+- `room_name`
+- `day`
+- `start_time`
+- `end_time`
+
+### `room_configurations` (sheet)
+
+Describes both individual and combined room options.
+
+- `room_id`
+- `room_name`
+- `is_combined` — `TRUE` for combined rooms like Room 1+2
+- `component_rooms` — Comma-separated list of subrooms (e.g., `Room 1,Room 2`)
+
+### `class_preferences` (sheet)
+
+Captures preferred scheduling conditions for each class.
+
+- `class_id`
+- `class_name`
+- `preference_type` — One of: `day`, `time`, `room`, `teacher`
+- `preference_value` — The actual preferred value (e.g., `"Monday"` or `"Makeda Hawkins"`)
+- `weight` — Priority level (typically 5–10)
+
+### `teacher_specializations` (sheet)
+
+Maps teachers to their qualified teaching areas.
+
+- `teacher_id`
+- `teacher_name`
+- `specialization_type` — One of: `style`, `age_group`
+- `specialization_value` — e.g. `"Jazz"` or `"7-10"`
 
 ## Project Architecture
 
