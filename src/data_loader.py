@@ -1,8 +1,8 @@
 """
 Data loader module for the Dance Studio Schedule Optimizer.
 
-This module contains functions for loading and parsing data from the Excel
-file.
+This module contains functions for loading and parsing data from the
+normalized Excel structure.
 """
 
 from datetime import datetime, timedelta
@@ -12,209 +12,190 @@ import pandas as pd
 
 def load_data(file_path):
     """
-    Load data from Excel file and return structured data objects.
+    Load data from the normalized Excel structure.
 
     Args:
         file_path (str): Path to the Excel file containing schedule data.
 
     Returns:
-        tuple: (classes, teachers, rooms) data structures.
+        dict: Dictionary containing all loaded data structures.
     """
-    # Load Excel sheets using pandas
-    try:
-        classes_df = pd.read_excel(file_path, sheet_name="classes")
-        teachers_df = pd.read_excel(file_path, sheet_name="teachers")
-        rooms_df = pd.read_excel(file_path, sheet_name="rooms")
-    except Exception as e:
-        raise ValueError(f"Error loading Excel file: {e}")
+    # Load all sheets
+    classes_df = pd.read_excel(file_path, sheet_name="classes")
+    room_availability_df = pd.read_excel(file_path, sheet_name="room_availability")
+    teacher_availability_df = pd.read_excel(
+        file_path, sheet_name="teacher_availability"
+    )
+    room_configs_df = pd.read_excel(file_path, sheet_name="room_configurations")
+    class_preferences_df = pd.read_excel(file_path, sheet_name="class_preferences")
+    teacher_specializations_df = pd.read_excel(
+        file_path, sheet_name="teacher_specializations"
+    )
 
-    # Process classes data
+    # Process classes
     classes = []
     for _, row in classes_df.iterrows():
         class_data = {
+            "class_id": int(row["class_id"]),
             "class_name": row["class_name"],
-            "style": row["style"] if "style" in row else "",
-            "level": row["level"] if "level" in row else "",
-            "age_start": row["age_start"] if "age_start" in row else 0,
-            "age_end": row["age_end"] if "age_end" in row else 99,
-            "duration": row["duration"],  # in hours
-            # convert to 15-min slots
-            "duration_slots": int(row["duration"] * 4),
-            "preferred_days": (
-                row["preferred_days"].split(",")
-                if isinstance(row["preferred_days"], str)
-                else []
-            ),
-            "preferred_time_ranges": (
-                parse_time_ranges(row["preferred_time_ranges"])
-                if isinstance(row["preferred_time_ranges"], str)
-                else {}
-            ),
-            "preferred_rooms": (
-                row["preferred_rooms"].split(",")
-                if isinstance(row["preferred_rooms"], str)
-                else []
-            ),
-            "preferred_teachers": (
-                row["preferred_teachers"].split(",")
-                if isinstance(row["preferred_teachers"], str)
-                else []
-            ),
+            "style": row["style"],
+            "level": row["level"],
+            "age_start": row["age_start"],
+            "age_end": row["age_end"],
+            "duration": row["duration"],
+            "duration_slots": int(row["duration"] * 4),  # Convert to 15-min slots
         }
         classes.append(class_data)
 
-    # Process teachers data
-    teachers = []
-    for _, row in teachers_df.iterrows():
-        teacher_data = {
-            "teacher_name": row["teacher_name"],
-            "availability": (
-                parse_availability(row["availability"])
-                if isinstance(row["availability"], str)
-                else {}
-            ),
-        }
-        teachers.append(teacher_data)
-
-    # Process rooms data
+    # Process room configurations
     rooms = []
-    for _, row in rooms_df.iterrows():
+    for _, row in room_configs_df.iterrows():
         room_data = {
+            "room_id": int(row["room_id"]),
             "room_name": row["room_name"],
-            "availability": (
-                parse_availability(row["availability"])
-                if isinstance(row["availability"], str)
-                else {}
+            "is_combined": bool(row["is_combined"]),
+            "component_rooms": (
+                row["component_rooms"].split(",")
+                if not pd.isna(row["component_rooms"])
+                else None
             ),
-            "group": row["group"] if "group" in row else None,
+            "group": row.get("group", None),
         }
         rooms.append(room_data)
 
-    return classes, teachers, rooms
+    # Create room name to ID mapping
+    room_name_to_id = {room["room_name"]: room["room_id"] for room in rooms}
 
+    # Process room availability
+    room_availability = {}
+    for _, row in room_availability_df.iterrows():
+        room_id = int(row["room_id"])
+        day = row["day"]
+        day_idx = day_to_index(day)
 
-def parse_availability(availability_str):
-    """
-    Parse availability string in format 'Day:Start-End,Day:Start-End,...'
+        # Convert time range to slots
+        start_time = datetime.strptime(row["start_time"], "%H:%M")
+        end_time = datetime.strptime(row["end_time"], "%H:%M")
 
-    Args:
-        availability_str (str): Availability string.
+        # Create 15-minute slots
+        current_time = start_time
+        while current_time < end_time:
+            slot_idx = time_to_slot_index(current_time)
 
-    Returns:
-        dict: Dictionary mapping days to lists of available time slots.
-    """
-    availability = {}
+            # Mark this slot as available
+            room_availability[(room_id, day_idx, slot_idx)] = True
 
-    # Split by comma to get day entries
-    day_entries = availability_str.split(",")
+            # Move to next slot
+            current_time += timedelta(minutes=15)
 
-    for entry in day_entries:
-        # Split by colon to separate day and time range
-        parts = entry.strip().split(":")
-        if len(parts) != 2:
-            continue
+    # Process teacher availability (similar to room availability)
+    teacher_availability = {}
+    for _, row in teacher_availability_df.iterrows():
+        teacher_id = int(row["teacher_id"])
+        day = row["day"]
+        day_idx = day_to_index(day)
 
-        day, time_range = parts
-        day = day.strip()
+        # Convert time range to slots
+        start_time = datetime.strptime(row["start_time"], "%H:%M")
+        end_time = datetime.strptime(row["end_time"], "%H:%M")
 
-        # Split time range by hyphen
-        time_parts = time_range.strip().split("-")
-        if len(time_parts) != 2:
-            continue
+        # Create 15-minute slots
+        current_time = start_time
+        while current_time < end_time:
+            slot_idx = time_to_slot_index(current_time)
 
-        start_time, end_time = time_parts
+            # Mark this slot as available
+            teacher_availability[(teacher_id, day_idx, slot_idx)] = True
 
-        # Convert times to slot indices
-        try:
-            start_dt = datetime.strptime(start_time, "%H:%M")
-            end_dt = datetime.strptime(end_time, "%H:%M")
+            # Move to next slot
+            current_time += timedelta(minutes=15)
 
-            # Calculate slot indices
-            slots = convert_to_time_slots(start_dt, end_dt)
+    # Process class preferences
+    class_preferences = {}
+    for _, row in class_preferences_df.iterrows():
+        class_id = int(row["class_id"])
+        pref_type = row["preference_type"]
+        pref_value = row["preference_value"]
+        weight = row["weight"]
 
-            # Add to availability dictionary
-            availability[day] = slots
-        except ValueError:
-            # Skip invalid time formats
-            continue
+        if class_id not in class_preferences:
+            class_preferences[class_id] = {}
 
-    return availability
+        if pref_type not in class_preferences[class_id]:
+            class_preferences[class_id][pref_type] = []
 
+        # For room preferences, convert room names to IDs if they're strings
+        if (
+            pref_type == "room"
+            and isinstance(pref_value, str)
+            and pref_value in room_name_to_id
+        ):
+            pref_value = room_name_to_id[pref_value]
 
-def parse_time_ranges(time_ranges_str):
-    """
-    Parse time ranges string for class preferences.
+        # For time preferences, convert time ranges to slot indices
+        if pref_type == "time" and isinstance(pref_value, str) and "-" in pref_value:
+            try:
+                start_time_str, end_time_str = pref_value.split("-")
+                start_time = datetime.strptime(start_time_str, "%H:%M")
+                end_time = datetime.strptime(end_time_str, "%H:%M")
 
-    Args:
-        time_ranges_str (str): Time ranges string.
+                # Convert to slot indices
+                start_slot = time_to_slot_index(start_time)
+                end_slot = time_to_slot_index(end_time)
 
-    Returns:
-        dict: Dictionary mapping days to lists of preferred time slots.
-    """
-    # This is similar to parse_availability but might have a different format
-    # For now, we'll assume the same format
-    return parse_availability(time_ranges_str)
+                # Create a list of all slots in the range
+                slots = list(range(start_slot, end_slot))
 
+                # Add each slot as a separate preference
+                for slot in slots:
+                    class_preferences[class_id][pref_type].append(
+                        {"value": slot, "weight": weight}
+                    )
 
-def convert_to_time_slots(start_time, end_time, slot_duration=15):
-    """
-    Convert time range to list of 15-minute time slots.
+                # Skip adding the original time range preference
+                continue
+            except Exception as e:
+                # If parsing fails, keep the original value
+                print(f"Warning: Could not parse time range '{pref_value}': {e}")
 
-    Args:
-        start_time (datetime): Start time.
-        end_time (datetime): End time.
-        slot_duration (int): Duration of each slot in minutes.
+        class_preferences[class_id][pref_type].append(
+            {"value": pref_value, "weight": weight}
+        )
 
-    Returns:
-        list: List of slot indices.
-    """
-    # Reference time (15:15)
-    reference_time = datetime.strptime("15:15", "%H:%M")
+    # Process teacher specializations
+    teacher_specializations = {}
+    for _, row in teacher_specializations_df.iterrows():
+        teacher_id = int(row["teacher_id"])
+        spec_type = row["specialization_type"]
+        spec_value = row["specialization_value"]
 
-    # Calculate start and end slots
-    start_delta = (start_time.hour - reference_time.hour) * 60 + (
-        start_time.minute - reference_time.minute
-    )
-    end_delta = (end_time.hour - reference_time.hour) * 60 + (
-        end_time.minute - reference_time.minute
-    )
+        if teacher_id not in teacher_specializations:
+            teacher_specializations[teacher_id] = {}
 
-    start_slot = max(0, start_delta // slot_duration)
-    end_slot = max(0, end_delta // slot_duration)
+        if spec_type not in teacher_specializations[teacher_id]:
+            teacher_specializations[teacher_id][spec_type] = []
 
-    # Generate list of slots
-    return list(range(start_slot, end_slot))
+        teacher_specializations[teacher_id][spec_type].append(spec_value)
 
-
-def time_slot_to_time(slot_index, slot_duration=15):
-    """
-    Convert slot index to time string.
-
-    Args:
-        slot_index (int): Slot index.
-        slot_duration (int): Duration of each slot in minutes.
-
-    Returns:
-        str: Time string in format HH:MM.
-    """
-    # Reference time (15:15)
-    reference_time = datetime.strptime("15:15", "%H:%M")
-
-    # Calculate time
-    slot_time = reference_time + timedelta(minutes=slot_index * slot_duration)
-
-    return slot_time.strftime("%H:%M")
+    return {
+        "classes": classes,
+        "rooms": rooms,
+        "room_availability": room_availability,
+        "teacher_availability": teacher_availability,
+        "class_preferences": class_preferences,
+        "teacher_specializations": teacher_specializations,
+    }
 
 
 def day_to_index(day):
     """
-    Convert day name to index.
+    Convert day name to index (0=Monday, 1=Tuesday, etc.).
 
     Args:
         day (str): Day name.
 
     Returns:
-        int: Day index (0 = Monday, 1 = Tuesday, etc.).
+        int: Day index.
     """
     days = {
         "Monday": 0,
@@ -250,3 +231,31 @@ def index_to_day(index):
     if 0 <= index < len(days):
         return days[index]
     return None
+
+
+def time_to_slot_index(time):
+    """
+    Convert time to slot index (0=00:00, 1=00:15, etc.).
+
+    Args:
+        time (datetime): Time object.
+
+    Returns:
+        int: Slot index.
+    """
+    return time.hour * 4 + time.minute // 15
+
+
+def slot_index_to_time(slot_index):
+    """
+    Convert slot index to time string.
+
+    Args:
+        slot_index (int): Slot index.
+
+    Returns:
+        str: Time string in format HH:MM.
+    """
+    hours = slot_index // 4
+    minutes = (slot_index % 4) * 15
+    return f"{hours:02d}:{minutes:02d}"

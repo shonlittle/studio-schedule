@@ -4,8 +4,8 @@ Scheduler module for the Dance Studio Schedule Optimizer.
 This module ties together the different phases of the scheduling approach.
 """
 
-from data_loader_v2 import load_data
-from output_v2 import create_schedule_output
+from data_loader import load_data
+from output import create_schedule_output
 from room_scheduler import assign_classes_to_slots
 from teacher_scheduler import assign_teachers_to_classes
 

@@ -5,7 +5,7 @@ This module contains functions for creating the room availability matrix
 and assigning classes to room-time slots (Phases 1 & 2).
 """
 
-from data_loader_v2 import index_to_day, slot_index_to_time
+from data_loader import index_to_day, slot_index_to_time
 
 
 def create_room_availability_matrix(rooms, room_availability):
