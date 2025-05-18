@@ -43,9 +43,9 @@ Indicates when teachers are available to teach.
 
 - `teacher_id` — Unique ID for the teacher
 - `teacher_name`
-- `day`
-- `start_time`
-- `end_time`
+- `day` - Day of week
+- `start_time` - Time in 24-hour format
+- `end_time` - Time in 24-hour
 
 ### `room_availability` (sheet)
 
@@ -53,15 +53,15 @@ Defines room availability on a per-day basis.
 
 - `room_id` — Unique ID for the room
 - `room_name`
-- `day`
-- `start_time`
-- `end_time`
+- `day` - Day of week
+- `start_time` - Time in 24-hour format
+- `end_time` - Time in 24-hour
 
 ### `room_configurations` (sheet)
 
 Describes both individual and combined room options.
 
-- `room_id`
+- `room_id` — Matches `room_availability` sheet
 - `room_name`
 - `is_combined` — `TRUE` for combined rooms like Room 1+2
 - `component_rooms` — Comma-separated list of subrooms (e.g., `Room 1,Room 2`)
@@ -70,7 +70,7 @@ Describes both individual and combined room options.
 
 Captures preferred scheduling conditions for each class.
 
-- `class_id`
+- `class_id` - Matches classes sheet
 - `class_name`
 - `preference_type` — One of: `day`, `time`, `room`, `teacher`
 - `preference_value` — The actual preferred value (e.g., `"Monday"` or `"Makeda Hawkins"`)
@@ -80,7 +80,7 @@ Captures preferred scheduling conditions for each class.
 
 Maps teachers to their qualified teaching areas.
 
-- `teacher_id`
+- `teacher_id` - Matches `teacher_availability` sheet
 - `teacher_name`
 - `specialization_type` — One of: `style`, `age_group`
 - `specialization_value` — e.g. `"Jazz"` or `"7-10"`
