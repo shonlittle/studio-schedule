@@ -1,5 +1,5 @@
 """
-Main module for the Dance Studio Schedule Optimizer.
+Main module for the Dance Studio Schedule Optimizer (Version 2).
 
 This module serves as the entry point for the scheduling system.
 """
