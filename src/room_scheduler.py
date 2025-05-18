@@ -20,51 +20,14 @@ def create_room_availability_matrix(rooms, room_availability):
         dict: Updated room time slot availability matrix.
     """
     # Start with the basic availability
-    room_time_slots = room_availability.copy()
+    room_time_slots = {}
 
-    # Process room conflicts
-    for room in rooms:
-        if room["is_combined"] and room["component_rooms"]:
-            room_id = room["room_id"]
-            # For each time slot where this combined room is available
-            for key in list(room_time_slots.keys()):
-                r_id, day_idx, slot_idx = key
-                if r_id == room_id and room_time_slots[key]:
-                    # Find the component room IDs
-                    component_ids = []
-                    for component_name in room["component_rooms"]:
-                        for r in rooms:
-                            if r["room_name"] == component_name:
-                                component_ids.append(r["room_id"])
-                                break
+    # First, copy all room availability to the room_time_slots dictionary
+    for key, value in room_availability.items():
+        room_time_slots[key] = value
 
-                    # Mark this slot as unavailable for component rooms
-                    for comp_id in component_ids:
-                        room_time_slots[(comp_id, day_idx, slot_idx)] = False
-
-    # Also handle the reverse - if a component room is in use, the combined room is unavailable
-    for room in rooms:
-        if not room["is_combined"]:
-            room_id = room["room_id"]
-            room_name = room["room_name"]
-
-            # Find all combined rooms that include this room
-            combined_room_ids = []
-            for r in rooms:
-                if (
-                    r["is_combined"]
-                    and r["component_rooms"]
-                    and room_name in r["component_rooms"]
-                ):
-                    combined_room_ids.append(r["room_id"])
-
-            # For each time slot where this room is available
-            for key in list(room_time_slots.keys()):
-                r_id, day_idx, slot_idx = key
-                if r_id == room_id and room_time_slots[key]:
-                    # Mark this slot as unavailable for combined rooms
-                    for comb_id in combined_room_ids:
-                        room_time_slots[(comb_id, day_idx, slot_idx)] = False
+    # We don't need to mark component rooms as unavailable when a combined room is available
+    # This will be handled in the assign_classes_to_slots function when a combined room is actually scheduled
 
     return room_time_slots
 
