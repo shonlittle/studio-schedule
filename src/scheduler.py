@@ -51,6 +51,7 @@ def schedule_classes(data_file, output_dir="output"):
         data["rooms"],
         data["teacher_specializations"],
         output_dir,
+        data["teacher_names"],  # Pass teacher names mapping
     )
 
     # Calculate statistics
