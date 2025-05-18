@@ -185,6 +185,11 @@ These tools are commonly used with this project. Install them if they’re not a
    ```bash
    python --version
    ```
+   **Note:** If the command above doesn't work or shows an older version (e.g., Python 2.7), try using python3 instead:
+
+```bash
+python3 --version
+```
 
 #### Install Git
 
@@ -199,7 +204,7 @@ Git is helpful for downloading this repo and managing changes, especially if you
 
 ### Optional: Install VS Code
 
-We recommend using [Visual Studio Code](https://code.visualstudio.com/) as your editor for this project.
+I recommend using [Visual Studio Code](https://code.visualstudio.com/) as your editor for this project.
 
 1. Download and install VS Code: https://code.visualstudio.com/
 2. Open the project folder (`studio-schedule/`) in VS Code
@@ -209,15 +214,31 @@ We recommend using [Visual Studio Code](https://code.visualstudio.com/) as your 
 
 Open a terminal in VS Code (`View` > `Terminal`) and run the setup commands:
 
+1. Clone this GitHub repo:
+
 ```bash
 git clone https://github.com/shonlittle/studio-schedule.git
 cd studio-schedule
-python -m venv .venv
+```
+
+2. Create a Python virtual environment:
+
+```bash
+python -m venv .venv # or in some cases python3 -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+```
+
+**Tip:** On some systems (especially macOS or Linux), use `python3` instead of `python` if you get a `python: command not found` error.
+
+3. Install third-party requirements:
+
+```bash
 pip install -r requirements.txt
 ```
 
 ## Usage
+
+Terminal command line to run the scheduler:
 
 ```bash
 python src/main.py [--data DATA_FILE] [--output OUTPUT_DIR]
