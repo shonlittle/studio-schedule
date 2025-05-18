@@ -171,6 +171,32 @@ A pre-formatted Excel file is available at `./data/schedule-template.xlsx` to he
 
 ## Installation
 
+### Optional: Install Python and Git
+
+These tools are commonly used with this project. Install them if they’re not already available on your system.
+
+#### Install Python
+
+1. Visit the official Python website: [https://www.python.org/downloads/](https://www.python.org/downloads/)
+2. Download the latest stable version of **Python 3.9 or higher**
+3. During installation:
+   - ✅ Check the box that says **"Add Python to PATH"**
+4. Verify installation in a terminal or command prompt:
+   ```bash
+   python --version
+   ```
+
+#### Install Git
+
+1. Visit: [https://git-scm.com/downloads](https://git-scm.com/downloads)
+2. Download and install the latest version for your operating system
+3. Confirm installation:
+   ```bash
+   git --version
+   ```
+
+Git is helpful for downloading this repo and managing changes, especially if you're syncing updates or collaborating.
+
 ### Optional: Install VS Code
 
 We recommend using [Visual Studio Code](https://code.visualstudio.com/) as your editor for this project.
@@ -178,9 +204,14 @@ We recommend using [Visual Studio Code](https://code.visualstudio.com/) as your 
 1. Download and install VS Code: https://code.visualstudio.com/
 2. Open the project folder (`studio-schedule/`) in VS Code
 3. If prompted, install the recommended extensions (such as Python support)
-4. Open a terminal in VS Code (`View` > `Terminal`) and run the setup commands:
+
+### Setup
+
+Open a terminal in VS Code (`View` > `Terminal`) and run the setup commands:
 
 ```bash
+git clone https://github.com/shonlittle/studio-schedule.git
+cd studio-schedule
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
