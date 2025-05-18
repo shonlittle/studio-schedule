@@ -17,6 +17,7 @@ def create_schedule_output(
     rooms,
     teacher_specializations,
     output_dir="output",
+    teacher_names=None,
 ):
     """
     Create Excel output file with schedule information.
@@ -27,6 +28,8 @@ def create_schedule_output(
         rooms (list): List of room data dictionaries.
         teacher_specializations (dict): Dictionary of teacher specializations.
         output_dir (str): Directory to save output files.
+        teacher_names (dict, optional): Dictionary mapping teacher_id to teacher_name.
+            If not provided, names will be extracted from teacher_specializations.
 
     Returns:
         str: Path to the created output file.
@@ -41,13 +44,18 @@ def create_schedule_output(
 
     # Create room and teacher name mappings
     room_names = {room["room_id"]: room["room_name"] for room in rooms}
-    teacher_names = {}
-    for teacher_id in teacher_specializations.keys():
-        # Extract teacher name from specializations
-        if "name" in teacher_specializations[teacher_id]:
-            teacher_names[teacher_id] = teacher_specializations[teacher_id]["name"][0]
-        else:
-            teacher_names[teacher_id] = f"Teacher {teacher_id}"
+
+    # Use provided teacher_names if available, otherwise create from specializations
+    if teacher_names is None:
+        teacher_names = {}
+        for teacher_id in teacher_specializations.keys():
+            # Extract teacher name from specializations
+            if "name" in teacher_specializations[teacher_id]:
+                teacher_names[teacher_id] = teacher_specializations[teacher_id]["name"][
+                    0
+                ]
+            else:
+                teacher_names[teacher_id] = f"Teacher {teacher_id}"
 
     # Format scheduled classes
     formatted_schedule = []
