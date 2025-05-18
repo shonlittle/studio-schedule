@@ -90,10 +90,16 @@ def load_data(file_path):
 
     # Process teacher availability (similar to room availability)
     teacher_availability = {}
+    teacher_names = {}  # Create a mapping from teacher_id to teacher_name
+
     for _, row in teacher_availability_df.iterrows():
         teacher_id = int(row["teacher_id"])
         day = row["day"]
         day_idx = day_to_index(day)
+
+        # Store teacher name if available
+        if "teacher_name" in row and not pd.isna(row["teacher_name"]):
+            teacher_names[teacher_id] = row["teacher_name"]
 
         # Convert time range to slots
         start_time = datetime.strptime(row["start_time"], "%H:%M")
@@ -184,6 +190,7 @@ def load_data(file_path):
         "teacher_availability": teacher_availability,
         "class_preferences": class_preferences,
         "teacher_specializations": teacher_specializations,
+        "teacher_names": teacher_names,  # Add teacher names mapping
     }
 
 
