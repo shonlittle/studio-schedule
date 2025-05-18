@@ -53,16 +53,18 @@ def create_schedule_output(
     formatted_schedule = []
     for entry in scheduled_classes:
         formatted_entry = {
+            "Class ID": entry["class_id"],
             "Class Name": entry["class_name"],
             "Style": entry["style"],
             "Level": entry["level"],
             "Age Range": f"{entry['age_start']}-{entry['age_end']}",
-            "Room": room_names.get(entry["room_id"], "Unknown"),
-            "Teacher": teacher_names.get(entry["teacher_id"], "Unassigned"),
             "Day": entry["day"],
             "Start Time": entry["start_time"],
             "End Time": entry["end_time"],
             "Duration (hours)": entry["duration"],
+            "Room": room_names.get(entry["room_id"], "Unknown"),
+            "Teacher ID": entry["teacher_id"],
+            "Teacher Name": teacher_names.get(entry["teacher_id"], "Unassigned"),
         }
         formatted_schedule.append(formatted_entry)
 
@@ -89,6 +91,7 @@ def create_schedule_output(
     formatted_unscheduled = []
     for entry in unscheduled_classes:
         formatted_entry = {
+            "Class ID": entry["class_id"],
             "Class Name": entry["class_name"],
             "Style": entry["style"],
             "Level": entry["level"],
