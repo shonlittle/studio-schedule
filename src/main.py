@@ -1,126 +1,74 @@
 """
 Main module for the Dance Studio Schedule Optimizer.
 
-This module contains the main entry point for the program.
+This module serves as the entry point for the scheduling system.
 """
 
 import argparse
 import os
 import sys
-import time
+from datetime import datetime
 
-from data_loader import load_data
-from model import create_model
-from output import create_schedule_output
-from solver import get_solution_stats, solve_schedule
+from scheduler import schedule_classes
 
 
 def main():
-    """Main entry point for the program."""
+    """
+    Main function to run the scheduling system.
+    """
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Dance Studio Schedule Optimizer")
     parser.add_argument(
         "--data",
+        "-d",
         type=str,
-        default="../data/schedule-data.xlsx",
+        default="data/schedule-data.xlsx",
         help="Path to the Excel file containing schedule data",
     )
     parser.add_argument(
-        "--output-dir",
+        "--output",
+        "-o",
         type=str,
-        default="../output",
-        help="Directory to save the output file",
-    )
-    parser.add_argument(
-        "--time-limit",
-        type=int,
-        default=60,
-        help="Time limit for solving in seconds",
+        default="output",
+        help="Directory to save output files",
     )
     args = parser.parse_args()
 
-    # Check if data file exists
+    # Validate input file
     if not os.path.exists(args.data):
-        print(f"Error: Data file '{args.data}' not found.")
+        print(f"Error: Input file '{args.data}' not found.")
         sys.exit(1)
 
-    # Check if output directory exists
-    if not os.path.exists(args.output_dir):
-        print(f"Error: Output directory '{args.output_dir}' not found.")
-        sys.exit(1)
+    # Create output directory if it doesn't exist
+    os.makedirs(args.output, exist_ok=True)
 
-    # Load data
-    print(f"Loading data from '{args.data}'...")
+    # Print start message
+    print(f"Starting Dance Studio Schedule Optimizer at {datetime.now()}")
+    print(f"Input file: {args.data}")
+    print(f"Output directory: {args.output}")
+    print("=" * 50)
+
     try:
-        classes, teachers, rooms = load_data(args.data)
-    except Exception as e:
-        print(f"Error loading data: {e}")
-        sys.exit(1)
+        # Run the scheduler
+        output_file, stats = schedule_classes(args.data, args.output)
 
-    print(
-        f"Loaded {len(classes)} classes, {len(teachers)} teachers, and {len(rooms)} rooms."
-    )
-
-    # Create model
-    print("Creating constraint model...")
-    start_time = time.time()
-    # Keep relax_constraints=True to allow some constraints to be relaxed
-    # but we'll ensure no room conflicts and no duplicate classes
-    model, variables = create_model(classes, teachers, rooms, relax_constraints=True)
-    model_time = time.time() - start_time
-    print(f"Model created in {model_time:.2f} seconds.")
-
-    # Solve model
-    print(f"Solving schedule (time limit: {args.time_limit} seconds)...")
-    start_time = time.time()
-    status, (schedule, unscheduled) = solve_schedule(
-        model, variables, classes, args.time_limit
-    )
-    solve_time = time.time() - start_time
-    print(f"Solving completed in {solve_time:.2f} seconds with status: {status}")
-
-    # Check if solution is feasible
-    if status in ["OPTIMAL", "FEASIBLE"]:
-        # Get solution statistics
-        stats = get_solution_stats(schedule, classes, rooms, teachers)
+        # Print statistics
+        print("\nScheduling completed successfully!")
+        print(f"Output file: {output_file}")
+        print("\nStatistics:")
+        print(f"  Total classes: {stats['total_classes']}")
+        print(f"  Scheduled classes: {stats['scheduled_classes']}")
+        print(f"  Unscheduled classes: {stats['unscheduled_classes']}")
+        print(f"  Scheduling rate: {stats['scheduling_rate']:.2%}")
+        print(f"  Unscheduled due to room conflicts: {stats['unscheduled_by_room']}")
         print(
-            f"Scheduled {stats['scheduled_classes']} out of {stats['total_classes']} classes "
-            f"({stats['scheduling_rate'] * 100:.1f}%)."
+            f"  Unscheduled due to teacher conflicts: {stats['unscheduled_by_teacher']}"
         )
-        print(f"Could not schedule {len(unscheduled)} classes.")
 
-        # Create output files
-        print("Creating output files...")
-        output_file = create_schedule_output(
-            schedule, unscheduled, rooms, teachers, args.output_dir
-        )
-        print(f"Schedule saved to '{output_file}'.")
-
-        # Create CSV output in current directory
-        from output import create_csv_output
-
-        csv_output_file = create_csv_output(
-            schedule, unscheduled, rooms, teachers, "output.csv"
-        )
-        print(f"CSV schedule saved to '{csv_output_file}'.")
-
-        # Print room utilization
-        print("\nRoom Utilization:")
-        for room_name, count in stats["room_utilization"].items():
-            print(f"  {room_name}: {count} classes")
-
-        # Print teacher utilization
-        print("\nTeacher Utilization:")
-        for teacher_name, count in stats["teacher_utilization"].items():
-            if not teacher_name.endswith("_days"):
-                days = stats["teacher_utilization"].get(f"{teacher_name}_days", 0)
-                print(f"  {teacher_name}: {count} classes across {days} days")
-
-        return 0
-    else:
-        print("No feasible solution found. Please check the constraints and try again.")
-        return 1
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
