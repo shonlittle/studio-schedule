@@ -7,7 +7,7 @@ df = pd.read_excel("data/schedule-data.xlsx", sheet_name="room_availability")
 df.loc[df["end_time"] == "ctu", "end_time"] = "21:00"
 
 # Create a new Excel writer
-writer = pd.ExcelWriter("data/schedule-data-fixed.xlsx", engine="openpyxl")
+writer = pd.ExcelWriter("data/schedule-data.xlsx", engine="openpyxl")
 
 # Copy all sheets from the original file to the new file
 for sheet_name in pd.ExcelFile("data/schedule-data.xlsx").sheet_names:

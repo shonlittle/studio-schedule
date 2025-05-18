@@ -4,7 +4,7 @@ from src.data_loader import load_data
 from src.room_scheduler import create_room_availability_matrix
 
 # Load data
-data = load_data("data/schedule-data-fixed.xlsx")
+data = load_data("data/schedule-data.xlsx")
 
 # Print room configurations
 print("Room Configurations:")
