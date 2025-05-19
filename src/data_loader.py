@@ -10,6 +10,23 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 
+def parse_time_value(time_value):
+    """
+    Parse a time value that could be either a string or a datetime.time object.
+
+    Args:
+        time_value: Either a string in format "HH:MM" or a datetime.time object
+
+    Returns:
+        datetime: A datetime object representing the time
+    """
+    if isinstance(time_value, str):
+        return datetime.strptime(time_value, "%H:%M")
+    else:
+        # Already a time object, convert to datetime
+        return datetime.combine(datetime.today(), time_value)
+
+
 def load_data(file_path):
     """
     Load data from the normalized Excel structure.
@@ -20,17 +37,32 @@ def load_data(file_path):
     Returns:
         dict: Dictionary containing all loaded data structures.
     """
+    # Define sheet names
+    classes_sheet = "classes"
+    room_avail_sheet = "room_availability"
+    room_config_sheet = "room_configurations"
+    teacher_avail_sheet = "teacher_availability"
+    teacher_spec_sheet = "teacher_specializations"
+    class_pref_sheet = "class_preferences"
+
+    # Load classes sheet
+    classes_df = load_excel_sheet(file_path, classes_sheet)
+
     # Load all sheets
-    classes_df = pd.read_excel(file_path, sheet_name="classes")
-    room_availability_df = pd.read_excel(file_path, sheet_name="room_availability")
-    teacher_availability_df = pd.read_excel(
-        file_path, sheet_name="teacher_availability"
-    )
-    room_configs_df = pd.read_excel(file_path, sheet_name="room_configurations")
-    class_preferences_df = pd.read_excel(file_path, sheet_name="class_preferences")
-    teacher_specializations_df = pd.read_excel(
-        file_path, sheet_name="teacher_specializations"
-    )
+    sheets = {
+        "room_avail": room_avail_sheet,
+        "room_config": room_config_sheet,
+        "teacher_avail": teacher_avail_sheet,
+        "teacher_spec": teacher_spec_sheet,
+        "class_pref": class_pref_sheet,
+    }
+
+    # Load each sheet
+    room_availability_df = load_excel_sheet(file_path, sheets["room_avail"])
+    room_configs_df = load_excel_sheet(file_path, sheets["room_config"])
+    teacher_availability_df = load_excel_sheet(file_path, sheets["teacher_avail"])
+    teacher_specializations_df = load_excel_sheet(file_path, sheets["teacher_spec"])
+    class_preferences_df = load_excel_sheet(file_path, sheets["class_pref"])
 
     # Process classes
     classes = []
@@ -43,7 +75,8 @@ def load_data(file_path):
             "age_start": row["age_start"],
             "age_end": row["age_end"],
             "duration": row["duration"],
-            "duration_slots": int(row["duration"] * 4),  # Convert to 15-min slots
+            # Convert hours to 15-minute slots (e.g., 1.5 hours = 6 slots)
+            "duration_slots": int(row["duration"] * 4),
         }
         classes.append(class_data)
 
@@ -74,8 +107,8 @@ def load_data(file_path):
         day_idx = day_to_index(day)
 
         # Convert time range to slots
-        start_time = datetime.strptime(row["start_time"], "%H:%M")
-        end_time = datetime.strptime(row["end_time"], "%H:%M")
+        start_time = parse_time_value(row["start_time"])
+        end_time = parse_time_value(row["end_time"])
 
         # Create 15-minute slots
         current_time = start_time
@@ -102,8 +135,8 @@ def load_data(file_path):
             teacher_names[teacher_id] = row["teacher_name"]
 
         # Convert time range to slots
-        start_time = datetime.strptime(row["start_time"], "%H:%M")
-        end_time = datetime.strptime(row["end_time"], "%H:%M")
+        start_time = parse_time_value(row["start_time"])
+        end_time = parse_time_value(row["end_time"])
 
         # Create 15-minute slots
         current_time = start_time
@@ -162,11 +195,18 @@ def load_data(file_path):
                 continue
             except Exception as e:
                 # If parsing fails, keep the original value
-                print(f"Warning: Could not parse time range '{pref_value}': {e}")
+                # Log parsing error
+                # Handle parsing error
+                error_prefix = "Warning: Cannot parse"
+                error_msg = f"{error_prefix} '{pref_value}'"
+                # Very short truncation to avoid line length issues
+                err_short = str(e)[:20]
+                print(f"{error_msg}: {err_short}")
 
-        class_preferences[class_id][pref_type].append(
-            {"value": pref_value, "weight": weight}
-        )
+        # Create preference object
+        pref_obj = {"value": pref_value, "weight": weight}
+        # Add to preferences list
+        class_preferences[class_id][pref_type].append(pref_obj)
 
     # Process teacher specializations
     teacher_specializations = {}
@@ -181,7 +221,9 @@ def load_data(file_path):
         if spec_type not in teacher_specializations[teacher_id]:
             teacher_specializations[teacher_id][spec_type] = []
 
-        teacher_specializations[teacher_id][spec_type].append(spec_value)
+        # Get the specialization list and append the value
+        spec_list = teacher_specializations[teacher_id][spec_type]
+        spec_list.append(spec_value)
 
     return {
         "classes": classes,
@@ -192,6 +234,20 @@ def load_data(file_path):
         "teacher_specializations": teacher_specializations,
         "teacher_names": teacher_names,  # Add teacher names mapping
     }
+
+
+def load_excel_sheet(file_path, sheet_name):
+    """
+    Load an Excel sheet into a pandas DataFrame.
+
+    Args:
+        file_path (str): Path to the Excel file.
+        sheet_name (str): Name of the sheet to load.
+
+    Returns:
+        DataFrame: Loaded data.
+    """
+    return pd.read_excel(file_path, sheet_name=sheet_name)
 
 
 def day_to_index(day):

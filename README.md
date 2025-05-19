@@ -45,7 +45,7 @@ Indicates when teachers are available to teach.
 - `teacher_name`
 - `day` - Day of week
 - `start_time` - Time in 24-hour format
-- `end_time` - Time in 24-hour
+- `end_time` - Time in 24-hour format
 
 ### `room_availability` (sheet)
 
@@ -55,7 +55,7 @@ Defines room availability on a per-day basis.
 - `room_name`
 - `day` - Day of week
 - `start_time` - Time in 24-hour format
-- `end_time` - Time in 24-hour
+- `end_time` - Time in 24-hour format
 
 ### `room_configurations` (sheet)
 

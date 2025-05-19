@@ -19,8 +19,8 @@ def schedule_classes(data_file, output_dir="output"):
         output_dir (str): Directory to save output files.
 
     Returns:
-        tuple: (output_file_path, stats) where output_file_path is the path to the
-               created output file and stats is a dictionary with scheduling statistics.
+        tuple: (output_file_path, stats) where output_file_path is the path to
+            the created output file and stats is a dictionary with statistics.
     """
     # Load data
     data = load_data(data_file)
@@ -55,15 +55,30 @@ def schedule_classes(data_file, output_dir="output"):
     )
 
     # Calculate statistics
+    classes = data["classes"]
     stats = {
-        "total_classes": len(data["classes"]),
+        "total_classes": len(classes),
         "scheduled_classes": len(final_scheduled),
         "unscheduled_classes": len(all_unscheduled),
-        "scheduling_rate": (
-            len(final_scheduled) / len(data["classes"]) if data["classes"] else 0
-        ),
+        "scheduling_rate": calc_scheduling_rate(final_scheduled, classes),
         "unscheduled_by_room": len(unscheduled_from_rooms),
         "unscheduled_by_teacher": len(unscheduled_from_teachers),
     }
 
     return output_file, stats
+
+
+def calc_scheduling_rate(scheduled, all_classes):
+    """
+    Calculate the scheduling rate.
+
+    Args:
+        scheduled (list): List of scheduled classes.
+        all_classes (list): List of all classes.
+
+    Returns:
+        float: Scheduling rate as a fraction.
+    """
+    if not all_classes:
+        return 0
+    return len(scheduled) / len(all_classes)
