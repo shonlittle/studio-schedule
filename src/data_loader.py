@@ -10,6 +10,23 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 
+def parse_time_value(time_value):
+    """
+    Parse a time value that could be either a string or a datetime.time object.
+
+    Args:
+        time_value: Either a string in format "HH:MM" or a datetime.time object
+
+    Returns:
+        datetime: A datetime object representing the time
+    """
+    if isinstance(time_value, str):
+        return datetime.strptime(time_value, "%H:%M")
+    else:
+        # Already a time object, convert to datetime
+        return datetime.combine(datetime.today(), time_value)
+
+
 def load_data(file_path):
     """
     Load data from the normalized Excel structure.
@@ -31,12 +48,21 @@ def load_data(file_path):
     # Load classes sheet
     classes_df = load_excel_sheet(file_path, classes_sheet)
 
-    # Load Excel sheets
-    room_availability_df = load_excel_sheet(file_path, room_avail_sheet)
-    room_configs_df = load_excel_sheet(file_path, room_config_sheet)
-    teacher_availability_df = load_excel_sheet(file_path, teacher_avail_sheet)
-    teacher_specializations_df = load_excel_sheet(file_path, teacher_spec_sheet)
-    class_preferences_df = load_excel_sheet(file_path, class_pref_sheet)
+    # Load all sheets
+    sheets = {
+        "room_avail": room_avail_sheet,
+        "room_config": room_config_sheet,
+        "teacher_avail": teacher_avail_sheet,
+        "teacher_spec": teacher_spec_sheet,
+        "class_pref": class_pref_sheet,
+    }
+
+    # Load each sheet
+    room_availability_df = load_excel_sheet(file_path, sheets["room_avail"])
+    room_configs_df = load_excel_sheet(file_path, sheets["room_config"])
+    teacher_availability_df = load_excel_sheet(file_path, sheets["teacher_avail"])
+    teacher_specializations_df = load_excel_sheet(file_path, sheets["teacher_spec"])
+    class_preferences_df = load_excel_sheet(file_path, sheets["class_pref"])
 
     # Process classes
     classes = []
@@ -81,17 +107,8 @@ def load_data(file_path):
         day_idx = day_to_index(day)
 
         # Convert time range to slots
-        if isinstance(row["start_time"], str):
-            start_time = datetime.strptime(row["start_time"], "%H:%M")
-        else:
-            # Already a time object, convert to datetime
-            start_time = datetime.combine(datetime.today(), row["start_time"])
-
-        if isinstance(row["end_time"], str):
-            end_time = datetime.strptime(row["end_time"], "%H:%M")
-        else:
-            # Already a time object, convert to datetime
-            end_time = datetime.combine(datetime.today(), row["end_time"])
+        start_time = parse_time_value(row["start_time"])
+        end_time = parse_time_value(row["end_time"])
 
         # Create 15-minute slots
         current_time = start_time
@@ -118,17 +135,8 @@ def load_data(file_path):
             teacher_names[teacher_id] = row["teacher_name"]
 
         # Convert time range to slots
-        if isinstance(row["start_time"], str):
-            start_time = datetime.strptime(row["start_time"], "%H:%M")
-        else:
-            # Already a time object, convert to datetime
-            start_time = datetime.combine(datetime.today(), row["start_time"])
-
-        if isinstance(row["end_time"], str):
-            end_time = datetime.strptime(row["end_time"], "%H:%M")
-        else:
-            # Already a time object, convert to datetime
-            end_time = datetime.combine(datetime.today(), row["end_time"])
+        start_time = parse_time_value(row["start_time"])
+        end_time = parse_time_value(row["end_time"])
 
         # Create 15-minute slots
         current_time = start_time
@@ -188,10 +196,12 @@ def load_data(file_path):
             except Exception as e:
                 # If parsing fails, keep the original value
                 # Log parsing error
-                # Truncate error message to keep line length under 79 chars
-                msg = f"Warning: Cannot parse '{pref_value}'"
-                err = str(e)[:40]
-                print(f"{msg}: {err}")
+                # Handle parsing error
+                error_prefix = "Warning: Cannot parse"
+                error_msg = f"{error_prefix} '{pref_value}'"
+                # Very short truncation to avoid line length issues
+                err_short = str(e)[:20]
+                print(f"{error_msg}: {err_short}")
 
         # Create preference object
         pref_obj = {"value": pref_value, "weight": weight}
