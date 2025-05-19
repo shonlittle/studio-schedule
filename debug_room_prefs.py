@@ -1,4 +1,9 @@
-import pandas as pd
+"""
+Debug utility for room preferences in the Dance Studio Schedule Optimizer.
+
+This script helps debug room preferences and availability by printing
+detailed information about room configurations and availability.
+"""
 
 from src.data_loader import load_data
 from src.room_scheduler import create_room_availability_matrix
@@ -9,8 +14,13 @@ data = load_data("data/schedule-data.xlsx")
 # Print room configurations
 print("Room Configurations:")
 for room in data["rooms"]:
+    room_id = room["room_id"]
+    room_name = room["room_name"]
+    is_combined = room["is_combined"]
     print(
-        f"Room ID: {room['room_id']}, Room Name: {room['room_name']}, Is Combined: {room['is_combined']}"
+        f"Room ID: {room_id}, "
+        f"Room Name: {room_name}, "
+        f"Is Combined: {is_combined}"
     )
 
 # Print class preferences for rooms
@@ -31,10 +41,13 @@ for key, value in data["room_availability"].items():
 print("\nAvailable Slots per Room in room_availability:")
 for room_id, count in room_avail_counts.items():
     room_name = next(
-        (room["room_name"] for room in data["rooms"] if room["room_id"] == room_id),
+        (r["room_name"] for r in data["rooms"] if r["room_id"] == room_id),
         "Unknown",
     )
-    print(f"Room ID: {room_id}, Room Name: {room_name}, Available Slots: {count}")
+    output = f"Room ID: {room_id}"
+    output += f", Room Name: {room_name}"
+    output += f", Available Slots: {count}"
+    print(output)
 
 # Create room availability matrix
 room_time_slots = create_room_availability_matrix(
@@ -49,7 +62,8 @@ for room_id in range(1, 7):
         r_id, day_idx, slot_idx = key
         if r_id == room_id and value and count < 5:
             print(
-                f"Room ID: {room_id}, Day: {day_idx}, Slot: {slot_idx}, Available: {value}"
+                f"Room ID: {room_id}, Day: {day_idx}, "
+                f"Slot: {slot_idx}, Available: {value}"
             )
             count += 1
     if count == 0:
@@ -67,7 +81,10 @@ for key, value in room_time_slots.items():
 print("\nAvailable Slots per Room:")
 for room_id, count in room_counts.items():
     room_name = next(
-        (room["room_name"] for room in data["rooms"] if room["room_id"] == room_id),
+        (r["room_name"] for r in data["rooms"] if r["room_id"] == room_id),
         "Unknown",
     )
-    print(f"Room ID: {room_id}, Room Name: {room_name}, Available Slots: {count}")
+    output = f"Room ID: {room_id}"
+    output += f", Room Name: {room_name}"
+    output += f", Available Slots: {count}"
+    print(output)

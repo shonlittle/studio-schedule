@@ -1,8 +1,8 @@
 """
 Output module for the Dance Studio Schedule Optimizer.
 
-This module contains functions for generating output files with schedule information,
-including both scheduled and unscheduled classes.
+This module contains functions for generating output files with schedule
+information, including both scheduled and unscheduled classes.
 """
 
 import os
@@ -28,8 +28,8 @@ def create_schedule_output(
         rooms (list): List of room data dictionaries.
         teacher_specializations (dict): Dictionary of teacher specializations.
         output_dir (str): Directory to save output files.
-        teacher_names (dict, optional): Dictionary mapping teacher_id to teacher_name.
-            If not provided, names will be extracted from teacher_specializations.
+        teacher_names (dict, optional): Dictionary of teacher ID to name
+            mappings. If None, names from specs will be used.
 
     Returns:
         str: Path to the created output file.
@@ -45,15 +45,15 @@ def create_schedule_output(
     # Create room and teacher name mappings
     room_names = {room["room_id"]: room["room_name"] for room in rooms}
 
-    # Use provided teacher_names if available, otherwise create from specializations
+    # Use provided teacher_names if available,
+    # otherwise create from specializations
     if teacher_names is None:
         teacher_names = {}
         for teacher_id in teacher_specializations.keys():
             # Extract teacher name from specializations
             if "name" in teacher_specializations[teacher_id]:
-                teacher_names[teacher_id] = teacher_specializations[teacher_id]["name"][
-                    0
-                ]
+                name_list = teacher_specializations[teacher_id]["name"]
+                teacher_names[teacher_id] = name_list[0]
             else:
                 teacher_names[teacher_id] = f"Teacher {teacher_id}"
 
@@ -65,14 +65,16 @@ def create_schedule_output(
             "Class Name": entry["class_name"],
             "Style": entry["style"],
             "Level": entry["level"],
-            "Age Range": f"{entry['age_start']}-{entry['age_end']}",
+            # Format age range
+            "Age Range": format_age_range(entry),
             "Day": entry["day"],
             "Start Time": entry["start_time"],
             "End Time": entry["end_time"],
             "Duration (hours)": entry["duration"],
             "Room": room_names.get(entry["room_id"], "Unknown"),
             "Teacher ID": entry["teacher_id"],
-            "Teacher Name": teacher_names.get(entry["teacher_id"], "Unassigned"),
+            # Get teacher name or default to "Unassigned"
+            "Teacher Name": get_teacher_name(teacher_names, entry),
         }
         formatted_schedule.append(formatted_entry)
 
@@ -103,7 +105,8 @@ def create_schedule_output(
             "Class Name": entry["class_name"],
             "Style": entry["style"],
             "Level": entry["level"],
-            "Age Range": f"{entry['age_start']}-{entry['age_end']}",
+            # Format age range
+            "Age Range": format_age_range(entry),
             "Duration (hours)": entry["duration"],
             "Reason": entry.get("reason", "Unknown"),
         }
@@ -119,9 +122,8 @@ def create_schedule_output(
 
         # Write unscheduled classes sheet
         if not unscheduled_df.empty:
-            unscheduled_df.to_excel(
-                writer, sheet_name="Unscheduled Classes", index=False
-            )
+            sheet_name = "Unscheduled Classes"
+            unscheduled_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
         # Create room-based schedule sheets
         create_room_schedule_sheets(writer, schedule_df)
@@ -165,6 +167,33 @@ def create_room_schedule_sheets(writer, schedule_df):
         if len(sheet_name) > 31:  # Excel sheet name length limit
             sheet_name = sheet_name[:31]
         group.to_excel(writer, sheet_name=sheet_name, index=False)
+
+
+def get_teacher_name(teacher_names, entry):
+    """
+    Get teacher name from mapping or return default.
+
+    Args:
+        teacher_names (dict): Mapping of teacher IDs to names.
+        entry (dict): Class entry with teacher_id.
+
+    Returns:
+        str: Teacher name or "Unassigned" if not found.
+    """
+    return teacher_names.get(entry["teacher_id"], "Unassigned")
+
+
+def format_age_range(entry):
+    """
+    Format age range as a string.
+
+    Args:
+        entry (dict): Class entry with age_start and age_end.
+
+    Returns:
+        str: Formatted age range.
+    """
+    return f"{entry['age_start']}-{entry['age_end']}"
 
 
 def create_day_schedule_sheets(writer, schedule_df):

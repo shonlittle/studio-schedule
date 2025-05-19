@@ -17,13 +17,14 @@ def main():
     Main function to run the scheduling system.
     """
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Dance Studio Schedule Optimizer")
+    desc = "Dance Studio Schedule Optimizer"
+    parser = argparse.ArgumentParser(description=desc)
     parser.add_argument(
         "--data",
         "-d",
         type=str,
         default="data/schedule-data.xlsx",
-        help="Path to the Excel file containing schedule data",
+        help="Path to the Excel file with schedule data",
     )
     parser.add_argument(
         "--output",
@@ -60,10 +61,10 @@ def main():
         print(f"  Scheduled classes: {stats['scheduled_classes']}")
         print(f"  Unscheduled classes: {stats['unscheduled_classes']}")
         print(f"  Scheduling rate: {stats['scheduling_rate']:.2%}")
-        print(f"  Unscheduled due to room conflicts: {stats['unscheduled_by_room']}")
-        print(
-            f"  Unscheduled due to teacher conflicts: {stats['unscheduled_by_teacher']}"
-        )
+        room_conflicts = stats["unscheduled_by_room"]
+        teacher_conflicts = stats["unscheduled_by_teacher"]
+        print(f"  Unscheduled (room conflicts): {room_conflicts}")
+        print(f"  Unscheduled (teacher conflicts): {teacher_conflicts}")
 
     except Exception as e:
         print(f"Error: {str(e)}")

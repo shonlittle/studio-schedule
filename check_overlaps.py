@@ -1,7 +1,16 @@
+"""
+Overlap detection utility for the Dance Studio Schedule Optimizer.
+
+This script checks for overlapping classes in the generated schedule,
+which would indicate scheduling conflicts that need to be resolved.
+"""
+
 import pandas as pd
 
 # Load the schedule
-df = pd.read_excel("output/schedule_20250517_161953.xlsx", sheet_name="Schedule")
+# File path to the schedule
+schedule_file = "output/schedule_20250517_161953.xlsx"
+df = pd.read_excel(schedule_file, sheet_name="Schedule")
 
 # Convert time strings to datetime objects for comparison
 df["Start"] = pd.to_datetime(df["Start Time"], format="%H:%M").dt.time
@@ -30,9 +39,18 @@ if overlaps:
     print("\nOverlapping classes:")
     for i, j in overlaps[:5]:  # Show up to 5 examples
         print(f"\nOverlap {i+1} vs {j+1}:")
-        print(
-            f"Class 1: {df.iloc[i]['Class Name']} in {df.iloc[i]['Room']} on {df.iloc[i]['Day']} from {df.iloc[i]['Start Time']} to {df.iloc[i]['End Time']}"
+        class1 = df.iloc[i]
+        class2 = df.iloc[j]
+        # Format class details for printing
+        class1_details = (
+            f"Class 1: {class1['Class Name']} in {class1['Room']} "
+            f"on {class1['Day']} from {class1['Start Time']} "
+            f"to {class1['End Time']}"
         )
-        print(
-            f"Class 2: {df.iloc[j]['Class Name']} in {df.iloc[j]['Room']} on {df.iloc[j]['Day']} from {df.iloc[j]['Start Time']} to {df.iloc[j]['End Time']}"
+        class2_details = (
+            f"Class 2: {class2['Class Name']} in {class2['Room']} "
+            f"on {class2['Day']} from {class2['Start Time']} "
+            f"to {class2['End Time']}"
         )
+        print(class1_details)
+        print(class2_details)

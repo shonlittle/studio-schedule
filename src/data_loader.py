@@ -20,17 +20,23 @@ def load_data(file_path):
     Returns:
         dict: Dictionary containing all loaded data structures.
     """
-    # Load all sheets
-    classes_df = pd.read_excel(file_path, sheet_name="classes")
-    room_availability_df = pd.read_excel(file_path, sheet_name="room_availability")
-    teacher_availability_df = pd.read_excel(
-        file_path, sheet_name="teacher_availability"
-    )
-    room_configs_df = pd.read_excel(file_path, sheet_name="room_configurations")
-    class_preferences_df = pd.read_excel(file_path, sheet_name="class_preferences")
-    teacher_specializations_df = pd.read_excel(
-        file_path, sheet_name="teacher_specializations"
-    )
+    # Define sheet names
+    classes_sheet = "classes"
+    room_avail_sheet = "room_availability"
+    room_config_sheet = "room_configurations"
+    teacher_avail_sheet = "teacher_availability"
+    teacher_spec_sheet = "teacher_specializations"
+    class_pref_sheet = "class_preferences"
+
+    # Load classes sheet
+    classes_df = load_excel_sheet(file_path, classes_sheet)
+
+    # Load Excel sheets
+    room_availability_df = load_excel_sheet(file_path, room_avail_sheet)
+    room_configs_df = load_excel_sheet(file_path, room_config_sheet)
+    teacher_availability_df = load_excel_sheet(file_path, teacher_avail_sheet)
+    teacher_specializations_df = load_excel_sheet(file_path, teacher_spec_sheet)
+    class_preferences_df = load_excel_sheet(file_path, class_pref_sheet)
 
     # Process classes
     classes = []
@@ -43,7 +49,8 @@ def load_data(file_path):
             "age_start": row["age_start"],
             "age_end": row["age_end"],
             "duration": row["duration"],
-            "duration_slots": int(row["duration"] * 4),  # Convert to 15-min slots
+            # Convert hours to 15-minute slots (e.g., 1.5 hours = 6 slots)
+            "duration_slots": int(row["duration"] * 4),
         }
         classes.append(class_data)
 
@@ -74,8 +81,17 @@ def load_data(file_path):
         day_idx = day_to_index(day)
 
         # Convert time range to slots
-        start_time = datetime.strptime(row["start_time"], "%H:%M")
-        end_time = datetime.strptime(row["end_time"], "%H:%M")
+        if isinstance(row["start_time"], str):
+            start_time = datetime.strptime(row["start_time"], "%H:%M")
+        else:
+            # Already a time object, convert to datetime
+            start_time = datetime.combine(datetime.today(), row["start_time"])
+
+        if isinstance(row["end_time"], str):
+            end_time = datetime.strptime(row["end_time"], "%H:%M")
+        else:
+            # Already a time object, convert to datetime
+            end_time = datetime.combine(datetime.today(), row["end_time"])
 
         # Create 15-minute slots
         current_time = start_time
@@ -102,8 +118,17 @@ def load_data(file_path):
             teacher_names[teacher_id] = row["teacher_name"]
 
         # Convert time range to slots
-        start_time = datetime.strptime(row["start_time"], "%H:%M")
-        end_time = datetime.strptime(row["end_time"], "%H:%M")
+        if isinstance(row["start_time"], str):
+            start_time = datetime.strptime(row["start_time"], "%H:%M")
+        else:
+            # Already a time object, convert to datetime
+            start_time = datetime.combine(datetime.today(), row["start_time"])
+
+        if isinstance(row["end_time"], str):
+            end_time = datetime.strptime(row["end_time"], "%H:%M")
+        else:
+            # Already a time object, convert to datetime
+            end_time = datetime.combine(datetime.today(), row["end_time"])
 
         # Create 15-minute slots
         current_time = start_time
@@ -162,11 +187,16 @@ def load_data(file_path):
                 continue
             except Exception as e:
                 # If parsing fails, keep the original value
-                print(f"Warning: Could not parse time range '{pref_value}': {e}")
+                # Log parsing error
+                # Truncate error message to keep line length under 79 chars
+                msg = f"Warning: Cannot parse '{pref_value}'"
+                err = str(e)[:40]
+                print(f"{msg}: {err}")
 
-        class_preferences[class_id][pref_type].append(
-            {"value": pref_value, "weight": weight}
-        )
+        # Create preference object
+        pref_obj = {"value": pref_value, "weight": weight}
+        # Add to preferences list
+        class_preferences[class_id][pref_type].append(pref_obj)
 
     # Process teacher specializations
     teacher_specializations = {}
@@ -181,7 +211,9 @@ def load_data(file_path):
         if spec_type not in teacher_specializations[teacher_id]:
             teacher_specializations[teacher_id][spec_type] = []
 
-        teacher_specializations[teacher_id][spec_type].append(spec_value)
+        # Get the specialization list and append the value
+        spec_list = teacher_specializations[teacher_id][spec_type]
+        spec_list.append(spec_value)
 
     return {
         "classes": classes,
@@ -192,6 +224,20 @@ def load_data(file_path):
         "teacher_specializations": teacher_specializations,
         "teacher_names": teacher_names,  # Add teacher names mapping
     }
+
+
+def load_excel_sheet(file_path, sheet_name):
+    """
+    Load an Excel sheet into a pandas DataFrame.
+
+    Args:
+        file_path (str): Path to the Excel file.
+        sheet_name (str): Name of the sheet to load.
+
+    Returns:
+        DataFrame: Loaded data.
+    """
+    return pd.read_excel(file_path, sheet_name=sheet_name)
 
 
 def day_to_index(day):

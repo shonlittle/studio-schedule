@@ -1,24 +1,30 @@
 """
 Teacher scheduler module for the Dance Studio Schedule Optimizer.
 
-This module contains functions for assigning teachers to scheduled classes (Phase 3).
+This module contains functions for assigning teachers to scheduled classes
+(Phase 3).
 """
 
 
 def assign_teachers_to_classes(
-    scheduled_classes, teacher_availability, class_preferences, teacher_specializations
+    scheduled_classes,
+    teacher_availability,
+    class_preferences,
+    teacher_specializations,
 ):
     """
     Assign teachers to scheduled classes.
 
     Args:
         scheduled_classes (list): List of scheduled class dictionaries.
-        teacher_availability (dict): Dictionary mapping (teacher_id, day_idx, slot_idx) to availability.
+        teacher_availability (dict): Dictionary mapping
+            (teacher_id, day_idx, slot_idx) to availability.
         class_preferences (dict): Dictionary of class preferences.
         teacher_specializations (dict): Dictionary of teacher specializations.
 
     Returns:
-        tuple: (assigned_classes, unassigned_classes) where each is a list of class dictionaries.
+        tuple: (assigned_classes, unassigned_classes) where each is a list
+            of class dictionaries.
     """
     # Sort classes chronologically
     scheduled_classes.sort(key=lambda c: (c["day_idx"], c["start_slot"]))
@@ -35,7 +41,8 @@ def assign_teachers_to_classes(
 
         # Find preferred teachers
         preferred_teachers = []
-        if class_id in class_preferences and "teacher" in class_preferences[class_id]:
+        has_prefs = class_id in class_preferences
+        if has_prefs and "teacher" in class_preferences[class_id]:
             preferred_teachers = [
                 (p["value"], p["weight"])
                 for p in class_preferences[class_id]["teacher"]
@@ -136,12 +143,12 @@ def score_teacher(
                     ):
                         score += 5
                         break
-                except:
+                except (ValueError, IndexError):
                     # If parsing fails, just check for exact match
-                    if (
-                        age_group
-                        == f"{scheduled_class['age_start']}-{scheduled_class['age_end']}"
-                    ):
+                    start = scheduled_class["age_start"]
+                    end = scheduled_class["age_end"]
+                    age_range = f"{start}-{end}"
+                    if age_group == age_range:
                         score += 5
                         break
 
