@@ -8,15 +8,17 @@ from data_loader import load_data
 from output import create_schedule_output
 from room_scheduler import assign_classes_to_slots
 from teacher_scheduler import assign_teachers_to_classes
+from visualization import create_schedule_visualization
 
 
-def schedule_classes(data_file, output_dir="output"):
+def schedule_classes(data_file, output_dir="output", create_visuals=True):
     """
     Schedule classes using the phased approach.
 
     Args:
         data_file (str): Path to the Excel file containing schedule data.
         output_dir (str): Directory to save output files.
+        create_visuals (bool): Whether to create schedule visualizations.
 
     Returns:
         tuple: (output_file_path, stats) where output_file_path is the path to
@@ -64,6 +66,15 @@ def schedule_classes(data_file, output_dir="output"):
         "unscheduled_by_room": len(unscheduled_from_rooms),
         "unscheduled_by_teacher": len(unscheduled_from_teachers),
     }
+
+    # Phase 5: Create visualization if requested
+    if create_visuals:
+        try:
+            vis_file = create_schedule_visualization(output_file, output_dir)
+            if vis_file:
+                print(f"Schedule visualization created: {vis_file}")
+        except Exception as e:
+            print(f"Warning: Could not create visualization: {str(e)}")
 
     return output_file, stats
 
