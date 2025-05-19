@@ -33,6 +33,11 @@ def main():
         default="output",
         help="Directory to save output files",
     )
+    parser.add_argument(
+        "--no-visuals",
+        action="store_true",
+        help="Skip generation of schedule visualization",
+    )
     args = parser.parse_args()
 
     # Validate input file
@@ -51,7 +56,8 @@ def main():
 
     try:
         # Run the scheduler
-        output_file, stats = schedule_classes(args.data, args.output)
+        create_visuals = not args.no_visuals
+        output_file, stats = schedule_classes(args.data, args.output, create_visuals)
 
         # Print statistics
         print("\nScheduling completed successfully!")
