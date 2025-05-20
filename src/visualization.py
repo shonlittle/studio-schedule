@@ -8,6 +8,7 @@ room and time.
 
 import os
 from datetime import datetime
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -15,17 +16,19 @@ import numpy as np
 import pandas as pd
 
 
-def create_schedule_visualization(schedule_file, output_dir="output", save_pdf=False):
+def create_schedule_visualization(
+    schedule_file: str, output_dir: str = "output", save_pdf: bool = False
+) -> str:
     """
     Create a visual representation of the schedule.
 
     Args:
-        schedule_file (str): Path to the Excel schedule file.
-        output_dir (str): Directory to save the visualization.
-        save_pdf (bool): Whether to also save as PDF.
+        schedule_file: Path to the Excel schedule file.
+        output_dir: Directory to save the visualization.
+        save_pdf: Whether to also save as PDF.
 
     Returns:
-        str: Path to the created visualization file.
+        Path to the created visualization file.
     """
     # Read the Excel file
     schedule_df = pd.read_excel(schedule_file, sheet_name="Schedule")
@@ -44,15 +47,15 @@ def create_schedule_visualization(schedule_file, output_dir="output", save_pdf=F
     return fig_path
 
 
-def process_schedule_data(schedule_df):
+def process_schedule_data(schedule_df: pd.DataFrame) -> Dict:
     """
     Process the schedule data for visualization.
 
     Args:
-        schedule_df (DataFrame): DataFrame with schedule information.
+        schedule_df: DataFrame with schedule information.
 
     Returns:
-        dict: Dictionary with processed data for each day.
+        Dictionary with processed data for each day.
     """
     # Define day order
     day_order = [
@@ -85,40 +88,7 @@ def process_schedule_data(schedule_df):
 
         # Handle combined rooms
         room = row["Room"]
-        rooms_to_use = []
-
-        # Check if this is a combined room (contains '+')
-        if "+" in room:
-            # Handle specific combined room patterns directly
-            if "Room 1+2" in room:
-                rooms_to_use = [1, 2]
-            elif "Room 3+4" in room:
-                rooms_to_use = [3, 4]
-            else:
-                # Split the combined room into individual rooms
-                room_parts = room.split("+")
-                for part in room_parts:
-                    # Clean up room name and extract room number
-                    clean_part = part.strip()
-                    if "Room" in clean_part:
-                        # Extract room number using more robust method
-                        # Remove "Room" and any non-digit characters
-                        room_str = "".join(
-                            c for c in clean_part.replace("Room", "") if c.isdigit()
-                        )
-                        if room_str:
-                            room_num = int(room_str)
-                            rooms_to_use.append(room_num)
-
-            # Combined room successfully processed
-        else:
-            # Single room, extract room number
-            if "Room" in room:
-                # Extract room number using more robust method
-                room_str = "".join(c for c in room.replace("Room", "") if c.isdigit())
-                if room_str:
-                    room_num = int(room_str)
-                    rooms_to_use.append(room_num)
+        rooms_to_use = extract_room_numbers(room)
 
         # Create class data
         class_data = {
@@ -138,18 +108,71 @@ def process_schedule_data(schedule_df):
     return days_data
 
 
-def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=False):
+def extract_room_numbers(room_str: str) -> List[int]:
+    """
+    Extract room numbers from a room string.
+
+    Args:
+        room_str: String containing room information.
+
+    Returns:
+        List of room numbers.
+    """
+    rooms_to_use = []
+
+    # Check if this is a combined room (contains '+')
+    if "+" in room_str:
+        # Handle specific combined room patterns directly
+        if "Room 1+2" in room_str:
+            rooms_to_use = [1, 2]
+        elif "Room 3+4" in room_str:
+            rooms_to_use = [3, 4]
+        else:
+            # Split the combined room into individual rooms
+            room_parts = room_str.split("+")
+            for part in room_parts:
+                # Clean up room name and extract room number
+                clean_part = part.strip()
+                if "Room" in clean_part:
+                    # Extract room number using more robust method
+                    # Remove "Room" and any non-digit characters
+                    room_digits = "".join(
+                        c for c in clean_part.replace("Room", "") if c.isdigit()
+                    )
+                    if room_digits:
+                        room_num = int(room_digits)
+                        rooms_to_use.append(room_num)
+    else:
+        # Single room, extract room number
+        if "Room" in room_str:
+            # Extract room number using more robust method
+            room_digits = "".join(
+                c for c in room_str.replace("Room", "") if c.isdigit()
+            )
+            if room_digits:
+                room_num = int(room_digits)
+                rooms_to_use.append(room_num)
+
+    return rooms_to_use
+
+
+def create_weekly_visualization(
+    days_data: Dict,
+    output_dir: str,
+    base_filename: str,
+    save_pdf: bool = False,
+) -> str:
     """
     Create a weekly visualization of the schedule.
 
     Args:
-        days_data (dict): Dictionary with processed data for each day.
-        output_dir (str): Directory to save the visualization.
-        base_filename (str): Base filename for the output file.
-        save_pdf (bool): Whether to also save as PDF.
+        days_data: Dictionary with processed data for each day.
+        output_dir: Directory to save the visualization.
+        base_filename: Base filename for the output file.
+        save_pdf: Whether to also save as PDF.
 
     Returns:
-        str: Path to the created visualization file.
+        Path to the created visualization file.
     """
     # Define day order
     day_order = [
@@ -170,7 +193,55 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
         print("No classes found in the schedule.")
         return None
 
-    # Determine time range across all days
+    # Collect all classes and prepare time points
+    all_classes, day_time_data = prepare_time_data(days_data, active_days)
+
+    # Create figure with subplots for each day
+    fig, axes = create_figure_with_subplots(day_time_data, active_days)
+
+    # Handle case with only one day
+    if len(active_days) == 1:
+        axes = [axes]
+
+    # Create teacher color mapping
+    teacher_colors = create_teacher_color_mapping(days_data, active_days)
+
+    # Process each day
+    for i, day in enumerate(active_days):
+        ax = axes[i]
+        setup_day_subplot(ax, day, day_time_data[day])
+        plot_classes_for_day(ax, days_data[day], day_time_data[day], teacher_colors)
+
+    # Add legend for teacher colors
+    add_teacher_legend(fig, axes, teacher_colors, active_days)
+
+    # Save figure
+    png_path = os.path.join(output_dir, f"{base_filename}.png")
+    plt.savefig(png_path, dpi=300, bbox_inches="tight")
+
+    # Optionally save as PDF
+    if save_pdf:
+        pdf_path = os.path.join(output_dir, f"{base_filename}.pdf")
+        plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
+
+    # Close the figure to free memory
+    plt.close(fig)
+
+    return png_path
+
+
+def prepare_time_data(days_data: Dict, active_days: List[str]) -> Tuple[List, Dict]:
+    """
+    Prepare time data for visualization.
+
+    Args:
+        days_data: Dictionary with processed data for each day.
+        active_days: List of days with classes.
+
+    Returns:
+        Tuple containing all classes and day-specific time data.
+    """
+    # Collect all classes
     all_classes = []
     for day in active_days:
         all_classes.extend(days_data[day])
@@ -199,9 +270,7 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
     latest_end = datetime.strptime(f"{latest_hour:02d}:{latest_minute:02d}", "%H:%M")
 
     # Process each day independently
-    day_time_points = {}
-    day_time_to_position = {}
-    day_num_positions = {}
+    day_time_data = {}
 
     # Calculate time points and positions for each day separately
     for day in active_days:
@@ -215,16 +284,29 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
         sorted_time_points = sorted(time_points)
 
         # Create day-specific mapping
-        day_time_points[day] = sorted_time_points
-        day_time_to_position[day] = {
-            time: i for i, time in enumerate(sorted_time_points)
+        day_time_data[day] = {
+            "time_points": sorted_time_points,
+            "position_map": {time: i for i, time in enumerate(sorted_time_points)},
+            "num_positions": len(sorted_time_points),
         }
-        day_num_positions[day] = len(sorted_time_points)
 
+    return all_classes, day_time_data
+
+
+def create_figure_with_subplots(day_time_data: Dict, active_days: List[str]) -> Tuple:
+    """
+    Create figure with subplots for each day.
+
+    Args:
+        day_time_data: Dictionary with time data for each day.
+        active_days: List of days with classes.
+
+    Returns:
+        Tuple containing figure and axes.
+    """
     # Calculate height ratios based on number of time positions per day
-    height_ratios = [day_num_positions[day] for day in active_days]
+    height_ratios = [day_time_data[day]["num_positions"] for day in active_days]
 
-    # Create figure with subplots for each day
     # Base height on the sum of all day positions
     total_positions = sum(height_ratios)
     fig_height = 2 + (total_positions * 0.4)  # Adjust scaling factor
@@ -237,10 +319,20 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
         gridspec_kw={"height_ratios": height_ratios},
     )
 
-    # Handle case with only one day
-    if len(active_days) == 1:
-        axes = [axes]
+    return fig, axes
 
+
+def create_teacher_color_mapping(days_data: Dict, active_days: List[str]) -> Dict:
+    """
+    Create a mapping of teacher names to colors.
+
+    Args:
+        days_data: Dictionary with processed data for each day.
+        active_days: List of days with classes.
+
+    Returns:
+        Dictionary mapping teacher names to colors.
+    """
     # Collect all unique teacher names across all days
     all_teachers = set()
     for day in active_days:
@@ -265,182 +357,247 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
         teacher: cmap(i % num_teachers) for i, teacher in enumerate(sorted_teachers)
     }
 
-    # Process each day
-    for i, day in enumerate(active_days):
-        ax = axes[i]
+    return teacher_colors
 
-        # Get day-specific data
-        day_sorted_time_points = day_time_points[day]
-        day_position_map = day_time_to_position[day]
-        day_position_count = day_num_positions[day]
 
-        # Set up the grid
-        ax.set_xlim(0, 4)  # 4 rooms
-        ax.set_ylim(0, day_position_count - 1)  # Day-specific y-axis limits
+def setup_day_subplot(ax, day: str, day_data: Dict) -> None:
+    """
+    Set up subplot for a specific day.
 
-        # Add room labels on x-axis
-        ax.set_xticks([0.5, 1.5, 2.5, 3.5])
-        ax.set_xticklabels(["Room 1", "Room 2", "Room 3", "Room 4"])
+    Args:
+        ax: Matplotlib axis.
+        day: Day name.
+        day_data: Time data for the day.
+    """
+    day_sorted_time_points = day_data["time_points"]
+    day_position_count = day_data["num_positions"]
 
-        # Add time labels on y-axis - day specific
-        y_ticks = np.arange(0, day_position_count)  # All time points for this day
-        y_labels = [day_sorted_time_points[i].strftime("%H:%M") for i in y_ticks]
-        ax.set_yticks(y_ticks)
-        ax.set_yticklabels(y_labels)
+    # Set up the grid
+    ax.set_xlim(0, 4)  # 4 rooms
+    ax.set_ylim(0, day_position_count - 1)  # Day-specific y-axis limits
 
-        # Invert y-axis so time flows downward
-        ax.invert_yaxis()
+    # Add room labels on x-axis
+    ax.set_xticks([0.5, 1.5, 2.5, 3.5])
+    ax.set_xticklabels(["Room 1", "Room 2", "Room 3", "Room 4"])
 
-        # Add day label
-        ax.set_title(day, fontsize=14, fontweight="bold")
+    # Add time labels on y-axis - day specific
+    y_ticks = np.arange(0, day_position_count)  # All time points for this day
+    y_labels = [day_sorted_time_points[i].strftime("%H:%M") for i in y_ticks]
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(y_labels)
 
-        # Add grid lines
-        ax.grid(True, linestyle="--", alpha=0.7)
+    # Invert y-axis so time flows downward
+    ax.invert_yaxis()
 
-        # Plot classes for this day
-        for j, class_data in enumerate(days_data[day]):
-            # Calculate position using the day-specific time mapping
-            start_pos = day_position_map[class_data["start_time"]]
-            end_pos = day_position_map[class_data["end_time"]]
-            height = end_pos - start_pos
+    # Add day label
+    ax.set_title(day, fontsize=14, fontweight="bold")
 
-            # Get color for this class based on teacher name
-            color = teacher_colors[class_data["teacher_name"]]
+    # Add grid lines
+    ax.grid(True, linestyle="--", alpha=0.7)
 
-            # Handle combined rooms
-            if class_data["is_combined"]:
-                # Check for specific combined room patterns
-                original_room = class_data["original_room"]
 
-                # Process combined room
+def plot_classes_for_day(
+    ax, day_classes: List, day_data: Dict, teacher_colors: Dict
+) -> None:
+    """
+    Plot classes for a specific day.
 
-                # Handle Room 1+2
-                if "1+2" in original_room or (
-                    1 in class_data["rooms"] and 2 in class_data["rooms"]
-                ):
-                    # Create rectangle spanning Room 1 and Room 2
-                    rect = patches.Rectangle(
-                        (0, start_pos),  # Start at Room 1 (index 0)
-                        2,  # Span 2 rooms
-                        height,
-                        linewidth=1,
-                        edgecolor="black",
-                        facecolor=color,
-                        alpha=0.7,
-                    )
-                    ax.add_patch(rect)
+    Args:
+        ax: Matplotlib axis.
+        day_classes: List of classes for the day.
+        day_data: Time data for the day.
+        teacher_colors: Mapping of teacher names to colors.
+    """
+    day_position_map = day_data["position_map"]
 
-                    # Add class name and teacher name in the middle of the rectangle
-                    ax.text(
-                        1,  # Center between Room 1 and Room 2
-                        start_pos + height / 2,
-                        f"{class_data['class_name']}\n{class_data['teacher_name']}",
-                        ha="center",
-                        va="center",
-                        fontsize=9,
-                        fontweight="bold",
-                        bbox=dict(
-                            facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"
-                        ),
-                    )
+    # Plot classes for this day
+    for class_data in day_classes:
+        # Calculate position using the day-specific time mapping
+        start_pos = day_position_map[class_data["start_time"]]
+        end_pos = day_position_map[class_data["end_time"]]
+        height = end_pos - start_pos
 
-                # Handle Room 3+4
-                elif "3+4" in original_room or (
-                    3 in class_data["rooms"] and 4 in class_data["rooms"]
-                ):
-                    # Create rectangle spanning Room 3 and Room 4
-                    rect = patches.Rectangle(
-                        (2, start_pos),  # Start at Room 3 (index 2)
-                        2,  # Span 2 rooms
-                        height,
-                        linewidth=1,
-                        edgecolor="black",
-                        facecolor=color,
-                        alpha=0.7,
-                    )
-                    ax.add_patch(rect)
+        # Get color for this class based on teacher name
+        color = teacher_colors[class_data["teacher_name"]]
 
-                    # Add class name and teacher name in the middle of the rectangle
-                    ax.text(
-                        3,  # Center between Room 3 and Room 4
-                        start_pos + height / 2,
-                        f"{class_data['class_name']}\n{class_data['teacher_name']}",
-                        ha="center",
-                        va="center",
-                        fontsize=9,
-                        fontweight="bold",
-                        bbox=dict(
-                            facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"
-                        ),
-                    )
+        # Handle combined rooms
+        if class_data["is_combined"]:
+            plot_combined_room_class(ax, class_data, start_pos, height, color)
+        else:
+            plot_single_room_class(ax, class_data, start_pos, height, color)
 
-                # Handle other combined rooms
-                else:
-                    # Get the min and max room numbers to span
-                    min_room = min(class_data["rooms"]) - 1  # 0-based index
-                    max_room = max(class_data["rooms"]) - 1
-                    width = max_room - min_room + 1
 
-                    # Create rectangle spanning multiple rooms
-                    rect = patches.Rectangle(
-                        (min_room, start_pos),
-                        width,
-                        height,
-                        linewidth=1,
-                        edgecolor="black",
-                        facecolor=color,
-                        alpha=0.7,
-                    )
-                    ax.add_patch(rect)
+def plot_combined_room_class(
+    ax, class_data: Dict, start_pos: int, height: int, color
+) -> None:
+    """
+    Plot a class that spans multiple rooms.
 
-                    # Add class name and teacher name in the middle of the rectangle
-                    ax.text(
-                        min_room + width / 2,
-                        start_pos + height / 2,
-                        f"{class_data['class_name']}\n{class_data['teacher_name']}",
-                        ha="center",
-                        va="center",
-                        fontsize=9,
-                        fontweight="bold",
-                        bbox=dict(
-                            facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"
-                        ),
-                    )
-            else:
-                # Single room
-                for room_num in class_data["rooms"]:
-                    room_idx = room_num - 1  # 0-based index
+    Args:
+        ax: Matplotlib axis.
+        class_data: Data for the class.
+        start_pos: Starting position on y-axis.
+        height: Height of the class block.
+        color: Color for the class block.
+    """
+    # Check for specific combined room patterns
+    original_room = class_data["original_room"]
 
-                    # Create rectangle for this class
-                    rect = patches.Rectangle(
-                        (room_idx, start_pos),
-                        1,
-                        height,
-                        linewidth=1,
-                        edgecolor="black",
-                        facecolor=color,
-                        alpha=0.7,
-                    )
-                    ax.add_patch(rect)
+    # Handle Room 1+2
+    if "1+2" in original_room or (
+        1 in class_data["rooms"] and 2 in class_data["rooms"]
+    ):
+        # Create rectangle spanning Room 1 and Room 2
+        rect = patches.Rectangle(
+            (0, start_pos),  # Start at Room 1 (index 0)
+            2,  # Span 2 rooms
+            height,
+            linewidth=1,
+            edgecolor="black",
+            facecolor=color,
+            alpha=0.7,
+        )
+        ax.add_patch(rect)
 
-                    # Add class name and teacher name
-                    ax.text(
-                        room_idx + 0.5,
-                        start_pos + height / 2,
-                        f"{class_data['class_name']}\n{class_data['teacher_name']}",
-                        ha="center",
-                        va="center",
-                        fontsize=9,
-                        fontweight="bold",
-                        bbox=dict(
-                            facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"
-                        ),
-                    )
+        # Add class name and teacher name in the middle of the rectangle
+        add_class_label(
+            ax,
+            1,  # Center between Room 1 and Room 2
+            start_pos + height / 2,
+            class_data["class_name"],
+            class_data["teacher_name"],
+        )
 
-    # Create a legend for teacher colors
+    # Handle Room 3+4
+    elif "3+4" in original_room or (
+        3 in class_data["rooms"] and 4 in class_data["rooms"]
+    ):
+        # Create rectangle spanning Room 3 and Room 4
+        rect = patches.Rectangle(
+            (2, start_pos),  # Start at Room 3 (index 2)
+            2,  # Span 2 rooms
+            height,
+            linewidth=1,
+            edgecolor="black",
+            facecolor=color,
+            alpha=0.7,
+        )
+        ax.add_patch(rect)
+
+        # Add class name and teacher name in the middle of the rectangle
+        add_class_label(
+            ax,
+            3,  # Center between Room 3 and Room 4
+            start_pos + height / 2,
+            class_data["class_name"],
+            class_data["teacher_name"],
+        )
+
+    # Handle other combined rooms
+    else:
+        # Get the min and max room numbers to span
+        min_room = min(class_data["rooms"]) - 1  # 0-based index
+        max_room = max(class_data["rooms"]) - 1
+        width = max_room - min_room + 1
+
+        # Create rectangle spanning multiple rooms
+        rect = patches.Rectangle(
+            (min_room, start_pos),
+            width,
+            height,
+            linewidth=1,
+            edgecolor="black",
+            facecolor=color,
+            alpha=0.7,
+        )
+        ax.add_patch(rect)
+
+        # Add class name and teacher name in the middle of the rectangle
+        add_class_label(
+            ax,
+            min_room + width / 2,
+            start_pos + height / 2,
+            class_data["class_name"],
+            class_data["teacher_name"],
+        )
+
+
+def plot_single_room_class(
+    ax, class_data: Dict, start_pos: int, height: int, color
+) -> None:
+    """
+    Plot a class in a single room.
+
+    Args:
+        ax: Matplotlib axis.
+        class_data: Data for the class.
+        start_pos: Starting position on y-axis.
+        height: Height of the class block.
+        color: Color for the class block.
+    """
+    # Single room
+    for room_num in class_data["rooms"]:
+        room_idx = room_num - 1  # 0-based index
+
+        # Create rectangle for this class
+        rect = patches.Rectangle(
+            (room_idx, start_pos),
+            1,
+            height,
+            linewidth=1,
+            edgecolor="black",
+            facecolor=color,
+            alpha=0.7,
+        )
+        ax.add_patch(rect)
+
+        # Add class name and teacher name
+        add_class_label(
+            ax,
+            room_idx + 0.5,
+            start_pos + height / 2,
+            class_data["class_name"],
+            class_data["teacher_name"],
+        )
+
+
+def add_class_label(ax, x: float, y: float, class_name: str, teacher_name: str) -> None:
+    """
+    Add a label for a class.
+
+    Args:
+        ax: Matplotlib axis.
+        x: X-coordinate for the label.
+        y: Y-coordinate for the label.
+        class_name: Name of the class.
+        teacher_name: Name of the teacher.
+    """
+    ax.text(
+        x,
+        y,
+        f"{class_name}\n{teacher_name}",
+        ha="center",
+        va="center",
+        fontsize=9,
+        fontweight="bold",
+        bbox=dict(facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"),
+    )
+
+
+def add_teacher_legend(fig, axes, teacher_colors: Dict, active_days: List[str]) -> None:
+    """
+    Add a legend for teacher colors.
+
+    Args:
+        fig: Matplotlib figure.
+        axes: Matplotlib axes.
+        teacher_colors: Mapping of teacher names to colors.
+        active_days: List of days with classes.
+    """
+    # Create legend handles
     legend_handles = [
         patches.Patch(color=teacher_colors[teacher], label=teacher)
-        for teacher in sorted_teachers
+        for teacher in sorted(teacher_colors.keys())
     ]
 
     # Add the legend to the figure
@@ -449,10 +606,12 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
         fig.legend(
             handles=legend_handles,
             loc="lower center",
-            ncol=min(5, len(sorted_teachers)),  # Up to 5 columns
+            ncol=min(5, len(teacher_colors)),  # Up to 5 columns
             bbox_to_anchor=(0.5, 0),
             fontsize=9,
         )
+        # Adjust layout with space for the legend
+        plt.tight_layout(rect=[0, 0.1, 1, 1])  # Leave space at bottom
     else:
         # For a single day, place legend to the right of the plot
         axes[0].legend(
@@ -461,24 +620,5 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
             bbox_to_anchor=(1.05, 0.5),
             fontsize=9,
         )
-
-    # Adjust layout with space for the legend
-    if len(active_days) > 1:
-        plt.tight_layout(rect=[0, 0.1, 1, 1])  # Leave space at bottom for legend
-    else:
-        plt.tight_layout(rect=[0, 0, 0.85, 1])  # Leave space at right for legend
-
-    # Save figure
-    png_path = os.path.join(output_dir, f"{base_filename}.png")
-    plt.savefig(png_path, dpi=300, bbox_inches="tight")
-
-    # Optionally save as PDF
-    pdf_path = None
-    if save_pdf:
-        pdf_path = os.path.join(output_dir, f"{base_filename}.pdf")
-        plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
-
-    # Close the figure to free memory
-    plt.close(fig)
-
-    return png_path
+        # Adjust layout with space for the legend
+        plt.tight_layout(rect=[0, 0, 0.85, 1])  # Leave space at right
