@@ -88,19 +88,36 @@ def process_schedule_data(schedule_df):
 
         # Check if this is a combined room (contains '+')
         if "+" in room:
-            # Split the combined room into individual rooms
-            room_parts = room.split("+")
-            for part in room_parts:
-                # Clean up room name and extract room number
-                clean_part = part.strip()
-                if "Room" in clean_part:
-                    room_num = int(clean_part.replace("Room", "").strip())
-                    rooms_to_use.append(room_num)
+            # Handle specific combined room patterns directly
+            if "Room 1+2" in room:
+                rooms_to_use = [1, 2]
+            elif "Room 3+4" in room:
+                rooms_to_use = [3, 4]
+            else:
+                # Split the combined room into individual rooms
+                room_parts = room.split("+")
+                for part in room_parts:
+                    # Clean up room name and extract room number
+                    clean_part = part.strip()
+                    if "Room" in clean_part:
+                        # Extract room number using more robust method
+                        # Remove "Room" and any non-digit characters
+                        room_str = "".join(
+                            c for c in clean_part.replace("Room", "") if c.isdigit()
+                        )
+                        if room_str:
+                            room_num = int(room_str)
+                            rooms_to_use.append(room_num)
+
+            # Combined room successfully processed
         else:
             # Single room, extract room number
             if "Room" in room:
-                room_num = int(room.replace("Room", "").strip())
-                rooms_to_use.append(room_num)
+                # Extract room number using more robust method
+                room_str = "".join(c for c in room.replace("Room", "") if c.isdigit())
+                if room_str:
+                    room_num = int(room_str)
+                    rooms_to_use.append(room_num)
 
         # Create class data
         class_data = {
@@ -111,6 +128,7 @@ def process_schedule_data(schedule_df):
             "duration": duration,
             "rooms": rooms_to_use,
             "is_combined": len(rooms_to_use) > 1,
+            "original_room": room,  # Store the original room string
         }
 
         # Add to the appropriate day
@@ -268,34 +286,103 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
 
             # Handle combined rooms
             if class_data["is_combined"]:
-                # Get the min and max room numbers to span
-                min_room = min(class_data["rooms"]) - 1  # 0-based index
-                max_room = max(class_data["rooms"]) - 1
-                width = max_room - min_room + 1
+                # Check for specific combined room patterns
+                original_room = class_data["original_room"]
 
-                # Create rectangle spanning multiple rooms
-                rect = patches.Rectangle(
-                    (min_room, start_pos),
-                    width,
-                    height,
-                    linewidth=1,
-                    edgecolor="black",
-                    facecolor=color,
-                    alpha=0.7,
-                )
-                ax.add_patch(rect)
+                # Process combined room
 
-                # Add class name and teacher name in the middle of the rectangle
-                ax.text(
-                    min_room + width / 2,
-                    start_pos + height / 2,
-                    f"{class_data['class_name']}\n{class_data['teacher_name']}",
-                    ha="center",
-                    va="center",
-                    fontsize=9,
-                    fontweight="bold",
-                    bbox=dict(facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"),
-                )
+                # Handle Room 1+2
+                if "1+2" in original_room or (
+                    1 in class_data["rooms"] and 2 in class_data["rooms"]
+                ):
+                    # Create rectangle spanning Room 1 and Room 2
+                    rect = patches.Rectangle(
+                        (0, start_pos),  # Start at Room 1 (index 0)
+                        2,  # Span 2 rooms
+                        height,
+                        linewidth=1,
+                        edgecolor="black",
+                        facecolor=color,
+                        alpha=0.7,
+                    )
+                    ax.add_patch(rect)
+
+                    # Add class name and teacher name in the middle of the rectangle
+                    ax.text(
+                        1,  # Center between Room 1 and Room 2
+                        start_pos + height / 2,
+                        f"{class_data['class_name']}\n{class_data['teacher_name']}",
+                        ha="center",
+                        va="center",
+                        fontsize=9,
+                        fontweight="bold",
+                        bbox=dict(
+                            facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"
+                        ),
+                    )
+
+                # Handle Room 3+4
+                elif "3+4" in original_room or (
+                    3 in class_data["rooms"] and 4 in class_data["rooms"]
+                ):
+                    # Create rectangle spanning Room 3 and Room 4
+                    rect = patches.Rectangle(
+                        (2, start_pos),  # Start at Room 3 (index 2)
+                        2,  # Span 2 rooms
+                        height,
+                        linewidth=1,
+                        edgecolor="black",
+                        facecolor=color,
+                        alpha=0.7,
+                    )
+                    ax.add_patch(rect)
+
+                    # Add class name and teacher name in the middle of the rectangle
+                    ax.text(
+                        3,  # Center between Room 3 and Room 4
+                        start_pos + height / 2,
+                        f"{class_data['class_name']}\n{class_data['teacher_name']}",
+                        ha="center",
+                        va="center",
+                        fontsize=9,
+                        fontweight="bold",
+                        bbox=dict(
+                            facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"
+                        ),
+                    )
+
+                # Handle other combined rooms
+                else:
+                    # Get the min and max room numbers to span
+                    min_room = min(class_data["rooms"]) - 1  # 0-based index
+                    max_room = max(class_data["rooms"]) - 1
+                    width = max_room - min_room + 1
+
+                    # Create rectangle spanning multiple rooms
+                    rect = patches.Rectangle(
+                        (min_room, start_pos),
+                        width,
+                        height,
+                        linewidth=1,
+                        edgecolor="black",
+                        facecolor=color,
+                        alpha=0.7,
+                    )
+                    ax.add_patch(rect)
+
+                    # Add class name and teacher name in the middle of the rectangle
+                    ax.text(
+                        min_room + width / 2,
+                        start_pos + height / 2,
+                        f"{class_data['class_name']}\n{class_data['teacher_name']}",
+                        ha="center",
+                        va="center",
+                        fontsize=9,
+                        fontweight="bold",
+                        bbox=dict(
+                            facecolor="white", alpha=0.7, boxstyle="round,pad=0.3"
+                        ),
+                    )
             else:
                 # Single room
                 for room_num in class_data["rooms"]:
