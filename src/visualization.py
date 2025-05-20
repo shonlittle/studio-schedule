@@ -27,18 +27,19 @@ def create_schedule_visualization(schedule_file, output_dir="output", save_pdf=F
     Returns:
         str: Path to the created visualization file.
     """
-    # Create visuals directory if it doesn't exist
-    visuals_dir = os.path.join(output_dir, "visuals")
-    os.makedirs(visuals_dir, exist_ok=True)
-
     # Read the Excel file
     schedule_df = pd.read_excel(schedule_file, sheet_name="Schedule")
 
     # Process the data for visualization
     days_data = process_schedule_data(schedule_df)
 
+    # Get the base filename without extension
+    base_filename = os.path.splitext(os.path.basename(schedule_file))[0]
+
     # Create the visualization
-    fig_path = create_weekly_visualization(days_data, visuals_dir, save_pdf)
+    fig_path = create_weekly_visualization(
+        days_data, output_dir, base_filename, save_pdf
+    )
 
     return fig_path
 
@@ -137,13 +138,14 @@ def process_schedule_data(schedule_df):
     return days_data
 
 
-def create_weekly_visualization(days_data, output_dir, save_pdf=False):
+def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=False):
     """
     Create a weekly visualization of the schedule.
 
     Args:
         days_data (dict): Dictionary with processed data for each day.
         output_dir (str): Directory to save the visualization.
+        base_filename (str): Base filename for the output file.
         save_pdf (bool): Whether to also save as PDF.
 
     Returns:
@@ -418,13 +420,13 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
     plt.tight_layout()
 
     # Save figure
-    png_path = os.path.join(output_dir, "full_week_schedule.png")
+    png_path = os.path.join(output_dir, f"{base_filename}.png")
     plt.savefig(png_path, dpi=300, bbox_inches="tight")
 
     # Optionally save as PDF
     pdf_path = None
     if save_pdf:
-        pdf_path = os.path.join(output_dir, "full_week_schedule.pdf")
+        pdf_path = os.path.join(output_dir, f"{base_filename}.pdf")
         plt.savefig(pdf_path, format="pdf", bbox_inches="tight")
 
     # Close the figure to free memory
