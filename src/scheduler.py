@@ -73,8 +73,10 @@ def schedule_classes(data_file, output_dir="output", create_visuals=True):
             vis_file = create_schedule_visualization(output_file, output_dir)
             if vis_file:
                 print(f"Schedule visualization created: {vis_file}")
+        except (FileNotFoundError, PermissionError, ValueError) as e:
+            logging.warning(f"Could not create visualization due to {type(e).__name__}: {e}")
         except Exception as e:
-            print(f"Warning: Could not create visualization: {str(e)}")
+            logging.error(f"An unexpected error occurred during visualization: {type(e).__name__}: {e}")
 
     return output_file, stats
 
