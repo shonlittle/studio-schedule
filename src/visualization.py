@@ -241,8 +241,29 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
     if len(active_days) == 1:
         axes = [axes]
 
-    # Set up color map for classes
-    cmap = plt.cm.get_cmap("tab20", 20)
+    # Collect all unique teacher names across all days
+    all_teachers = set()
+    for day in active_days:
+        for class_data in days_data[day]:
+            all_teachers.add(class_data["teacher_name"])
+
+    # Sort teacher names for consistent color assignment
+    sorted_teachers = sorted(list(all_teachers))
+
+    # Choose an appropriate colormap with enough colors for all teachers
+    num_teachers = len(sorted_teachers)
+    if num_teachers <= 10:
+        cmap = plt.cm.get_cmap("tab10", 10)
+    elif num_teachers <= 20:
+        cmap = plt.cm.get_cmap("tab20", 20)
+    else:
+        # For more than 20 teachers, use a continuous colormap
+        cmap = plt.cm.get_cmap("hsv", num_teachers)
+
+    # Create a mapping of teacher names to colors
+    teacher_colors = {
+        teacher: cmap(i % num_teachers) for i, teacher in enumerate(sorted_teachers)
+    }
 
     # Process each day
     for i, day in enumerate(active_days):
@@ -283,8 +304,8 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
             end_pos = day_position_map[class_data["end_time"]]
             height = end_pos - start_pos
 
-            # Get color for this class (cycle through colormap)
-            color = cmap(j % 20)
+            # Get color for this class based on teacher name
+            color = teacher_colors[class_data["teacher_name"]]
 
             # Handle combined rooms
             if class_data["is_combined"]:
@@ -416,8 +437,36 @@ def create_weekly_visualization(days_data, output_dir, base_filename, save_pdf=F
                         ),
                     )
 
-    # Adjust layout
-    plt.tight_layout()
+    # Create a legend for teacher colors
+    legend_handles = [
+        patches.Patch(color=teacher_colors[teacher], label=teacher)
+        for teacher in sorted_teachers
+    ]
+
+    # Add the legend to the figure
+    if len(active_days) > 1:
+        # For multiple days, place legend at the bottom of the figure
+        fig.legend(
+            handles=legend_handles,
+            loc="lower center",
+            ncol=min(5, len(sorted_teachers)),  # Up to 5 columns
+            bbox_to_anchor=(0.5, 0),
+            fontsize=9,
+        )
+    else:
+        # For a single day, place legend to the right of the plot
+        axes[0].legend(
+            handles=legend_handles,
+            loc="center left",
+            bbox_to_anchor=(1.05, 0.5),
+            fontsize=9,
+        )
+
+    # Adjust layout with space for the legend
+    if len(active_days) > 1:
+        plt.tight_layout(rect=[0, 0.1, 1, 1])  # Leave space at bottom for legend
+    else:
+        plt.tight_layout(rect=[0, 0, 0.85, 1])  # Leave space at right for legend
 
     # Save figure
     png_path = os.path.join(output_dir, f"{base_filename}.png")
