@@ -14,7 +14,7 @@ trim_trailing_whitespace = true
 end_of_line = lf
 
 # Markdown files
-[*.{md,markdonw}]
+[*.{md,markdown}]
 trim_trailing_whitespace = false
 
 # Python files
