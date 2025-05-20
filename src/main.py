@@ -57,7 +57,9 @@ def main():
     try:
         # Run the scheduler
         create_visuals = not args.no_visuals
-        output_file, stats = schedule_classes(args.data, args.output, create_visuals)
+        output_file, stats = schedule_classes(
+            args.data, args.output, create_visuals
+        )
 
         # Print statistics
         print("\nScheduling completed successfully!")

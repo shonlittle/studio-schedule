@@ -75,7 +75,8 @@ def process_schedule_data(schedule_df: pd.DataFrame) -> Dict:
     for _, row in schedule_df.iterrows():
         day = row["Day"]
 
-        # Skip if day is not in our day order (shouldn't happen, but just in case)
+        # Skip if day is not in our day order
+        # (shouldn't happen, but just in case)
         if day not in day_order:
             continue
 
@@ -99,7 +100,7 @@ def process_schedule_data(schedule_df: pd.DataFrame) -> Dict:
             "duration": duration,
             "rooms": rooms_to_use,
             "is_combined": len(rooms_to_use) > 1,
-            "original_room": room,  # Store the original room string
+            "original_room": room,  # Store original room string
         }
 
         # Add to the appropriate day
@@ -137,7 +138,9 @@ def extract_room_numbers(room_str: str) -> List[int]:
                     # Extract room number using more robust method
                     # Remove "Room" and any non-digit characters
                     digits = "".join(
-                        c for c in clean_part.replace("Room", "") if c.isdigit()
+                        c
+                        for c in clean_part.replace("Room", "")
+                        if c.isdigit()
                     )
                     if digits:
                         room_num = int(digits)
@@ -146,7 +149,9 @@ def extract_room_numbers(room_str: str) -> List[int]:
         # Single room, extract room number
         if "Room" in room_str:
             # Extract room number using more robust method
-            digits = "".join(c for c in room_str.replace("Room", "") if c.isdigit())
+            digits = "".join(
+                c for c in room_str.replace("Room", "") if c.isdigit()
+            )
             if digits:
                 room_num = int(digits)
                 rooms_to_use.append(room_num)
@@ -208,7 +213,12 @@ def create_weekly_visualization(
     for i, day in enumerate(active_days):
         ax = axes[i]
         setup_day_subplot(ax, day, day_time_data[day])
-        plot_classes_for_day(ax, days_data[day], day_time_data[day], teacher_colors)
+        plot_classes_for_day(
+            ax,
+            days_data[day],
+            day_time_data[day],
+            teacher_colors,
+        )
 
     # Add legend for teacher colors
     add_teacher_legend(fig, axes, teacher_colors, active_days)
@@ -228,7 +238,9 @@ def create_weekly_visualization(
     return png_path
 
 
-def prepare_time_data(days_data: Dict, active_days: List[str]) -> Tuple[List, Dict]:
+def prepare_time_data(
+    days_data: Dict, active_days: List[str]
+) -> Tuple[List, Dict]:
     """
     Prepare time data for visualization.
 
@@ -292,7 +304,9 @@ def prepare_time_data(days_data: Dict, active_days: List[str]) -> Tuple[List, Di
     return all_classes, day_time_data
 
 
-def create_figure_with_subplots(day_time_data: Dict, active_days: List[str]) -> Tuple:
+def create_figure_with_subplots(
+    day_time_data: Dict, active_days: List[str]
+) -> Tuple:
     """
     Create figure with subplots for each day.
 
@@ -304,7 +318,10 @@ def create_figure_with_subplots(day_time_data: Dict, active_days: List[str]) -> 
         Tuple containing figure and axes.
     """
     # Calculate height ratios based on number of time positions per day
-    height_ratios = [day_time_data[day]["num_positions"] for day in active_days]
+    height_ratios = [
+        day_time_data[day]["num_positions"]
+        for day in active_days
+    ]
 
     # Base height on the sum of all day positions
     total_positions = sum(height_ratios)
@@ -323,7 +340,9 @@ def create_figure_with_subplots(day_time_data: Dict, active_days: List[str]) -> 
     return fig, axes
 
 
-def create_teacher_color_mapping(days_data: Dict, active_days: List[str]) -> Dict:
+def create_teacher_color_mapping(
+    days_data: Dict, active_days: List[str]
+) -> Dict:
     """
     Create a mapping of teacher names to colors.
 
@@ -355,7 +374,8 @@ def create_teacher_color_mapping(days_data: Dict, active_days: List[str]) -> Dic
 
     # Create a mapping of teacher names to colors
     teacher_colors = {
-        teacher: cmap(i % num_teachers) for i, teacher in enumerate(sorted_teachers)
+        teacher: cmap(i % num_teachers)
+        for i, teacher in enumerate(sorted_teachers)
     }
 
     return teacher_colors
@@ -563,7 +583,9 @@ def plot_single_room_class(
         )
 
 
-def add_class_label(ax, x: float, y: float, class_name: str, teacher_name: str) -> None:
+def add_class_label(
+    ax, x: float, y: float, class_name: str, teacher_name: str
+) -> None:
     """
     Add a label for a class.
 
@@ -590,7 +612,12 @@ def add_class_label(ax, x: float, y: float, class_name: str, teacher_name: str) 
     )
 
 
-def add_teacher_legend(fig, axes, teacher_colors: Dict, active_days: List[str]) -> None:
+def add_teacher_legend(
+    fig,
+    axes,
+    teacher_colors: Dict,
+    active_days: List[str],
+) -> None:
     """
     Add a legend for teacher colors.
 
