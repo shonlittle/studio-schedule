@@ -7,7 +7,7 @@ room and time.
 """
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -178,18 +178,43 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
         latest_minute = 0
     latest_end = datetime.strptime(f"{latest_hour:02d}:{latest_minute:02d}", "%H:%M")
 
-    # Calculate number of 15-minute slots
-    time_slots = int((latest_end - earliest_start).total_seconds() / (15 * 60))
+    # Process each day independently
+    day_time_points = {}
+    day_time_to_position = {}
+    day_num_positions = {}
+
+    # Calculate time points and positions for each day separately
+    for day in active_days:
+        # Collect time points for this day only
+        time_points = set()
+        for class_data in days_data[day]:
+            time_points.add(class_data["start_time"])
+            time_points.add(class_data["end_time"])
+
+        # Sort time points for this day
+        sorted_time_points = sorted(time_points)
+
+        # Create day-specific mapping
+        day_time_points[day] = sorted_time_points
+        day_time_to_position[day] = {
+            time: i for i, time in enumerate(sorted_time_points)
+        }
+        day_num_positions[day] = len(sorted_time_points)
+
+    # Calculate height ratios based on number of time positions per day
+    height_ratios = [day_num_positions[day] for day in active_days]
 
     # Create figure with subplots for each day
-    fig_height = 2 + (time_slots * 0.25)  # Scale height based on time range
+    # Base height on the sum of all day positions
+    total_positions = sum(height_ratios)
+    fig_height = 2 + (total_positions * 0.4)  # Adjust scaling factor
     fig_width = 12  # Fixed width
 
     fig, axes = plt.subplots(
         len(active_days),
         1,
         figsize=(fig_width, fig_height),
-        gridspec_kw={"height_ratios": [time_slots] * len(active_days)},
+        gridspec_kw={"height_ratios": height_ratios},
     )
 
     # Handle case with only one day
@@ -203,24 +228,22 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
     for i, day in enumerate(active_days):
         ax = axes[i]
 
+        # Get day-specific data
+        day_sorted_time_points = day_time_points[day]
+        day_position_map = day_time_to_position[day]
+        day_position_count = day_num_positions[day]
+
         # Set up the grid
         ax.set_xlim(0, 4)  # 4 rooms
-        ax.set_ylim(0, time_slots)
+        ax.set_ylim(0, day_position_count - 1)  # Day-specific y-axis limits
 
         # Add room labels on x-axis
         ax.set_xticks([0.5, 1.5, 2.5, 3.5])
         ax.set_xticklabels(["Room 1", "Room 2", "Room 3", "Room 4"])
 
-        # Add time labels on y-axis
-        time_labels = []
-        current_time = earliest_start
-        for _ in range(time_slots + 1):
-            time_labels.append(current_time.strftime("%H:%M"))
-            current_time += timedelta(minutes=15)
-
-        # Place time labels every hour (4 slots)
-        y_ticks = np.arange(0, time_slots + 1, 4)
-        y_labels = [time_labels[i] for i in y_ticks]
+        # Add time labels on y-axis - day specific
+        y_ticks = np.arange(0, day_position_count)  # All time points for this day
+        y_labels = [day_sorted_time_points[i].strftime("%H:%M") for i in y_ticks]
         ax.set_yticks(y_ticks)
         ax.set_yticklabels(y_labels)
 
@@ -235,11 +258,10 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
 
         # Plot classes for this day
         for j, class_data in enumerate(days_data[day]):
-            # Calculate position and size
-            start_slot = (class_data["start_time"] - earliest_start).total_seconds() / (
-                15 * 60
-            )
-            height = class_data["duration"] * 4  # 4 slots per hour
+            # Calculate position using the day-specific time mapping
+            start_pos = day_position_map[class_data["start_time"]]
+            end_pos = day_position_map[class_data["end_time"]]
+            height = end_pos - start_pos
 
             # Get color for this class (cycle through colormap)
             color = cmap(j % 20)
@@ -253,7 +275,7 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
 
                 # Create rectangle spanning multiple rooms
                 rect = patches.Rectangle(
-                    (min_room, start_slot),
+                    (min_room, start_pos),
                     width,
                     height,
                     linewidth=1,
@@ -266,7 +288,7 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
                 # Add class name and teacher name in the middle of the rectangle
                 ax.text(
                     min_room + width / 2,
-                    start_slot + height / 2,
+                    start_pos + height / 2,
                     f"{class_data['class_name']}\n{class_data['teacher_name']}",
                     ha="center",
                     va="center",
@@ -281,7 +303,7 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
 
                     # Create rectangle for this class
                     rect = patches.Rectangle(
-                        (room_idx, start_slot),
+                        (room_idx, start_pos),
                         1,
                         height,
                         linewidth=1,
@@ -294,7 +316,7 @@ def create_weekly_visualization(days_data, output_dir, save_pdf=False):
                     # Add class name and teacher name
                     ax.text(
                         room_idx + 0.5,
-                        start_slot + height / 2,
+                        start_pos + height / 2,
                         f"{class_data['class_name']}\n{class_data['teacher_name']}",
                         ha="center",
                         va="center",
