@@ -22,6 +22,11 @@ An intelligent class scheduling system for dance studios, built in Python.
   - Separate tab for unscheduled classes
   - Room-specific schedule tabs
   - Day-specific schedule tabs
+- Generates visual weekly schedule representation:
+  - Color-coded classes by teacher
+  - Classes displayed as blocks spanning horizontally by room and vertically by time
+  - Proper handling of combined rooms (spanning multiple columns)
+  - Days arranged in vertical sequence from Sunday through Saturday
 
 ## Excel Input Format
 
@@ -94,12 +99,15 @@ graph TD
     A --> C2[Teacher Scheduler Module]
     A --> D[Scheduler Module]
     A --> E[Output Formatting Module]
+    A --> V[Visualization Module]
     B --> F[Excel Data]
     C1 --> D
     C2 --> D
     D --> H[Schedule Solution]
     H --> E
+    H --> V
     E --> I[Output Excel/CSV]
+    V --> J[Visual Schedule PNG/PDF]
 ```
 
 ## Project Structure
@@ -116,7 +124,8 @@ studio-schedule/
 │   ├── room_scheduler.py  # Room scheduling logic
 │   ├── teacher_scheduler.py # Teacher assignment logic
 │   ├── scheduler.py       # Main scheduling coordination
-│   └── output.py          # Output formatting and Excel generation
+│   ├── output.py          # Output formatting and Excel generation
+│   └── visualization.py   # Schedule visualization generation
 ├── debug_room_prefs.py    # Utility for debugging room preferences
 ├── fix_data.py            # Utility for fixing data issues
 ├── check_overlaps.py      # Utility for checking schedule conflicts
@@ -144,6 +153,34 @@ The scheduler generates an Excel file with multiple tabs for different views of 
 4. **Day-specific tabs**: Individual tabs for each day of the week showing the classes scheduled on that day.
 
 This comprehensive output format makes it easy to analyze the schedule from different perspectives and identify any issues or opportunities for improvement.
+
+## Schedule Visualization
+
+The scheduler automatically generates a visual representation of the weekly schedule:
+
+![Sample Schedule Visualization](output/sample_schedule.png)
+
+### Visualization Features
+
+- **Layout**:
+  - **Y-axis**: Time of day in 15-minute increments
+  - **X-axis**: Rooms (Room 1-4)
+  - **Vertical arrangement**: Days of the week from Sunday through Saturday
+
+- **Class Display**:
+  - Each class is represented as a colored block
+  - Block position is based on start time and room
+  - Block height is proportional to class duration
+  - Each block is labeled with class name and teacher name
+  - Classes are color-coded by teacher (with legend)
+
+- **Room Handling**:
+  - Combined rooms (e.g., Room 1+2) are displayed as blocks spanning multiple columns
+  - All four rooms (Room 1-4) are always displayed
+
+- **Output**:
+  - Visualization is saved as a PNG file in the output directory
+  - File naming matches the Excel output (e.g., `schedule_20250520_085837.png`)
 
 ## Using the Schedule Template
 
@@ -248,6 +285,7 @@ python src/main.py [--data DATA_FILE] [--output OUTPUT_DIR]
 
 - `--data` or `-d`: Path to the Excel file containing schedule data (default: `data/schedule-data.xlsx`)
 - `--output` or `-o`: Directory to save output files (default: `output`)
+- `--no-visuals`: Skip generation of schedule visualization
 
 ### Example Usage
 
@@ -260,6 +298,9 @@ python src/main.py --data data/my-schedule-data.xlsx
 
 # Specify both data file and output directory
 python src/main.py --data data/my-schedule-data.xlsx --output my-output
+
+# Run without generating visualization
+python src/main.py --no-visuals
 ```
 
 The program will generate an Excel file with the optimized schedule in the specified output directory. The file will be named with a timestamp (e.g., `schedule_20250517_174510.xlsx`).
@@ -281,6 +322,7 @@ See `requirements.txt` for dependencies. Main ones include:
 
 - pandas (>= 1.4.0): For data manipulation and analysis
 - openpyxl (>= 3.0.0): For Excel file reading and writing
+- matplotlib (>= 3.5.0): For schedule visualization generation
 
 ## License
 
