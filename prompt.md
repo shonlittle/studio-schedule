@@ -91,6 +91,16 @@ Please create a Python application that:
    - Include a main schedule with all classes
    - Create a separate tab for unscheduled classes with reasons
    - Generate room-specific and day-specific schedule tabs
+   - Create a visual weekly schedule representation with classes mapped by room and time
+
+6. **Provides visual schedule representation**:
+
+   - Generate a single visual schedule with time on Y-axis and rooms on X-axis
+   - Display class blocks spanning horizontally by room and vertically by time
+   - Color-code classes by teacher with a legend
+   - Handle combined rooms by spanning blocks across multiple columns
+   - Group and sort classes by day (Sunday through Saturday)
+   - Save visualization as PNG image (with optional PDF format)
 
 ### Code Structure
 
@@ -102,6 +112,7 @@ Please organize the code into the following modules:
 4. **teacher_scheduler.py**: Logic for assigning teachers to scheduled classes
 5. **scheduler.py**: Coordination between different scheduling phases
 6. **output.py**: Formatting and generating Excel output
+7. **visualization.py**: Creating visual representations of the schedule
 
 ### Output Format
 
@@ -133,6 +144,15 @@ The output Excel file should include:
 
 4. **Day-specific sheets** showing classes for each day of the week
 
+5. **Visual Schedule Output**:
+
+   - PNG image file showing the weekly schedule
+   - Classes displayed as colored blocks on a grid
+   - Time of day on Y-axis in 15-minute increments
+   - Rooms on X-axis (Room 1-4)
+   - Days arranged vertically in sequence
+   - Each class block labeled with class name and teacher name
+
 ### Optional Features
 
 If possible, please include these advanced features:
@@ -160,11 +180,19 @@ If possible, please include these advanced features:
 5. **User-friendly command-line interface**:
 
    - Support for specifying input file path and output directory
+   - Option to skip visualization generation (--no-visuals flag)
    - Clear progress and error messages
+
+6. **Enhanced visualization options**:
+
+   - Option to save schedule visualization as PDF
+   - Customizable visualization settings (colors, layout, etc.)
+   - Output directory for visualization files
 
 ### Implementation Notes
 
 - Use pandas for data manipulation
+- Use matplotlib for schedule visualization
 - Break each day into 15-minute time slots for flexible scheduling
 - Sort classes by scheduling difficulty (prioritize harder-to-schedule classes first)
 - Use a scoring system to evaluate potential room-time-teacher assignments
