@@ -177,8 +177,8 @@ cython_debug/
 .qodo/
 
 # Output files
-output/
-output.csv
+/output/schedule_*.xlsx
+/output/schedule_*.png
 
 # Data helper files
 data_helpers/
