@@ -8,7 +8,7 @@ room and time.
 
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Dict, List, Tuple
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -136,21 +136,19 @@ def extract_room_numbers(room_str: str) -> List[int]:
                 if "Room" in clean_part:
                     # Extract room number using more robust method
                     # Remove "Room" and any non-digit characters
-                    room_digits = "".join(
+                    digits = "".join(
                         c for c in clean_part.replace("Room", "") if c.isdigit()
                     )
-                    if room_digits:
-                        room_num = int(room_digits)
+                    if digits:
+                        room_num = int(digits)
                         rooms_to_use.append(room_num)
     else:
         # Single room, extract room number
         if "Room" in room_str:
             # Extract room number using more robust method
-            room_digits = "".join(
-                c for c in room_str.replace("Room", "") if c.isdigit()
-            )
-            if room_digits:
-                room_num = int(room_digits)
+            digits = "".join(c for c in room_str.replace("Room", "") if c.isdigit())
+            if digits:
+                room_num = int(digits)
                 rooms_to_use.append(room_num)
 
     return rooms_to_use
@@ -258,16 +256,16 @@ def prepare_time_data(days_data: Dict, active_days: List[str]) -> Tuple[List, Di
     # Round to nearest 15 minutes for clean display
     earliest_hour = earliest_start.hour
     earliest_minute = (earliest_start.minute // 15) * 15
-    earliest_start = datetime.strptime(
-        f"{earliest_hour:02d}:{earliest_minute:02d}", "%H:%M"
-    )
+    time_str = f"{earliest_hour:02d}:{earliest_minute:02d}"
+    earliest_start = datetime.strptime(time_str, "%H:%M")
 
     latest_hour = latest_end.hour
     latest_minute = ((latest_end.minute + 14) // 15) * 15  # Round up
     if latest_minute == 60:
         latest_hour += 1
         latest_minute = 0
-    latest_end = datetime.strptime(f"{latest_hour:02d}:{latest_minute:02d}", "%H:%M")
+    time_str = f"{latest_hour:02d}:{latest_minute:02d}"
+    latest_end = datetime.strptime(time_str, "%H:%M")
 
     # Process each day independently
     day_time_data = {}
@@ -284,9 +282,10 @@ def prepare_time_data(days_data: Dict, active_days: List[str]) -> Tuple[List, Di
         sorted_time_points = sorted(time_points)
 
         # Create day-specific mapping
+        position_map = {time: i for i, time in enumerate(sorted_time_points)}
         day_time_data[day] = {
             "time_points": sorted_time_points,
-            "position_map": {time: i for i, time in enumerate(sorted_time_points)},
+            "position_map": position_map,
             "num_positions": len(sorted_time_points),
         }
 
@@ -312,11 +311,13 @@ def create_figure_with_subplots(day_time_data: Dict, active_days: List[str]) -> 
     fig_height = 2 + (total_positions * 0.4)  # Adjust scaling factor
     fig_width = 12  # Fixed width
 
+    # Create figure with subplots
+    gridspec_kw = {"height_ratios": height_ratios}
     fig, axes = plt.subplots(
         len(active_days),
         1,
         figsize=(fig_width, fig_height),
-        gridspec_kw={"height_ratios": height_ratios},
+        gridspec_kw=gridspec_kw,
     )
 
     return fig, axes
@@ -442,11 +443,10 @@ def plot_combined_room_class(
     """
     # Check for specific combined room patterns
     original_room = class_data["original_room"]
+    rooms = class_data["rooms"]
 
     # Handle Room 1+2
-    if "1+2" in original_room or (
-        1 in class_data["rooms"] and 2 in class_data["rooms"]
-    ):
+    if "1+2" in original_room or (1 in rooms and 2 in rooms):
         # Create rectangle spanning Room 1 and Room 2
         rect = patches.Rectangle(
             (0, start_pos),  # Start at Room 1 (index 0)
@@ -469,9 +469,7 @@ def plot_combined_room_class(
         )
 
     # Handle Room 3+4
-    elif "3+4" in original_room or (
-        3 in class_data["rooms"] and 4 in class_data["rooms"]
-    ):
+    elif "3+4" in original_room or (3 in rooms and 4 in rooms):
         # Create rectangle spanning Room 3 and Room 4
         rect = patches.Rectangle(
             (2, start_pos),  # Start at Room 3 (index 2)
@@ -496,8 +494,8 @@ def plot_combined_room_class(
     # Handle other combined rooms
     else:
         # Get the min and max room numbers to span
-        min_room = min(class_data["rooms"]) - 1  # 0-based index
-        max_room = max(class_data["rooms"]) - 1
+        min_room = min(rooms) - 1  # 0-based index
+        max_room = max(rooms) - 1
         width = max_room - min_room + 1
 
         # Create rectangle spanning multiple rooms
@@ -513,10 +511,12 @@ def plot_combined_room_class(
         ax.add_patch(rect)
 
         # Add class name and teacher name in the middle of the rectangle
+        center_x = min_room + width / 2
+        center_y = start_pos + height / 2
         add_class_label(
             ax,
-            min_room + width / 2,
-            start_pos + height / 2,
+            center_x,
+            center_y,
             class_data["class_name"],
             class_data["teacher_name"],
         )
@@ -552,10 +552,12 @@ def plot_single_room_class(
         ax.add_patch(rect)
 
         # Add class name and teacher name
+        center_x = room_idx + 0.5
+        center_y = start_pos + height / 2
         add_class_label(
             ax,
-            room_idx + 0.5,
-            start_pos + height / 2,
+            center_x,
+            center_y,
             class_data["class_name"],
             class_data["teacher_name"],
         )
@@ -572,10 +574,14 @@ def add_class_label(ax, x: float, y: float, class_name: str, teacher_name: str) 
         class_name: Name of the class.
         teacher_name: Name of the teacher.
     """
+    # Create label text with class name and teacher name
+    label_text = f"{class_name}\n{teacher_name}"
+
+    # Add text to the plot
     ax.text(
         x,
         y,
-        f"{class_name}\n{teacher_name}",
+        label_text,
         ha="center",
         va="center",
         fontsize=9,
@@ -603,10 +609,11 @@ def add_teacher_legend(fig, axes, teacher_colors: Dict, active_days: List[str]) 
     # Add the legend to the figure
     if len(active_days) > 1:
         # For multiple days, place legend at the bottom of the figure
+        ncol = min(5, len(teacher_colors))  # Up to 5 columns
         fig.legend(
             handles=legend_handles,
             loc="lower center",
-            ncol=min(5, len(teacher_colors)),  # Up to 5 columns
+            ncol=ncol,
             bbox_to_anchor=(0.5, 0),
             fontsize=9,
         )
